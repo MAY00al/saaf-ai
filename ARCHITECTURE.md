@@ -22,7 +22,7 @@
 
 ## Application design
 
-Use a single Python application with FastAPI as the HTTP boundary in Phase 7. LangGraph routes typed requests and manages per-request state. LangChain integrates configurable OpenAI or Gemini chat and embeddings. Agents receive use-case inputs and call injected services. They have no direct SQLite, ChromaDB, or HTTP access. SQLite is the authoritative store for mutable farm and workflow records. ChromaDB serves a rebuildable scientific search index. The original JSON inputs remain the source artifacts.
+FastAPI and the CLI share a runtime factory that wires LangGraph, repositories, and lazily initialized agent adapters. LangChain integrates configurable OpenAI or Gemini chat and embeddings. Agents receive use-case inputs and call injected services. SQLite stores mutable farm and workflow records. ChromaDB serves a rebuildable scientific search index. The original JSON inputs remain the source artifacts.
 
 **Knowledge flow.** Validate IDs and cross-references, then embed one `text_ar` per record. Store scalar metadata for filtering and hydrate full conditions, caveats, and source details by record ID from the validated corpus. Track corpus and embedding configuration so index rebuilds are repeatable. Evaluate Arabic retrieval on an annotated question set, including hard negatives. Return insufficient evidence if retrieved material cannot support the claim.
 
@@ -30,7 +30,9 @@ Use a single Python application with FastAPI as the HTTP boundary in Phase 7. La
 
 **Control flow.** The CLI invokes an acyclic LangGraph with a typed `AgentState`. A normalized Arabic rule-based router selects recommendation, collection, impact, or monitoring, or requests clarification. A turn runs at most one agent. The Recommendation Agent calls typed read-only farm and evidence tools that validate arguments, farm identity, and evidence membership. The graph preserves structured output and maps failures to Arabic messages.
 
-Conversation context is supplied by the caller and returned with each result. It holds an active farm ID, the last supported intent and question, and a temporary collection draft. A recognized follow-up can reuse the previous question for the same farm. Switching farms discards the previous question and draft. Conflicting IDs stop dispatch. The interactive CLI keeps this context in memory. A future remote API must hold drafts in trusted session state.
+Conversation context holds the active farm ID, previous intent and question, and temporary collection and monitoring drafts. A recognized follow-up can reuse the previous question for the same farm. Switching farms discards the previous question and drafts. Conflicting IDs stop dispatch. The CLI keeps context in memory. The HTTP boundary owns context in bounded, expiring single-worker sessions and serializes turns per session. Dedicated confirmation routes match an exact collection draft or a pending observation ID against that state.
+
+The HTTP API validates typed JSON requests and responses, accepts bounded raw image uploads, and exposes generated images through session-scoped URLs. Arabic error envelopes omit raw input and exception details. Explicit CORS origins allow the local frontend to call the API. The local MVP runs on loopback and has no shared session backend or user authentication.
 
 **Collection.** The collection service reads the simulation profile, captures the user's quantity in kilograms, and proposes the next simulated availability date. It checks farm identity and proposal date at confirmation. The SQLite `collection_requests` table stores request ID, farm foreign key, requested quantity, pickup date, creation timestamp, status, and simulation flag. A unique farm/date/quantity key makes repeated writes idempotent. Tracking is farm-scoped. Cancellation records a local status transition.
 

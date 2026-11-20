@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-Phases 0–5 delivered the scaffold, scientific retrieval, farm repository, recommendation, routing, collection, and impact. Phase 6 adds local CPU monitoring and a Colab workflow for the Al Ain dataset. The trained checkpoint and its matching evaluation report are installed locally. See [README.md](README.md) for CLI workflows and tests. Phase 7 requires owner approval.
+Phases 0–6 delivered the scaffold, scientific retrieval, farm repository, recommendation, routing, collection, impact, and palm monitoring. Phase 7 integrates all four agents into the FastAPI application and documents the local HTTP interface. See the [frontend integration guide](docs/API_INTEGRATION.md).
 
 Phase 3 verification passed 61 offline tests and one live Gemini integration test covering a cited Saudi dialect query and an unsupported irrigation-savings request. Corpus-wide live retrieval calibration remains open.
 
@@ -11,6 +11,8 @@ Phase 5 verification passed 118 offline tests, including the earlier regression 
 The Phase 6 dataset audit verified 922 annotated images split into 737 train, 92 validation, and 93 test. The [checkpoint report](models/evaluation_report.json) records 97.67% precision, 96.96% recall, 99.25% mAP50, 78.95% mAP50–95, and 1.70 palms per image counting MAE. Geographic independence remains unverified.
 
 The trained checkpoint passed local CPU inference through LangGraph on three held-out tiles. All 126 offline regression tests passed.
+
+Phase 7 verification passed 131 offline tests, including HTTP flows for all four agents. A separate local HTTP smoke test loaded the trained CPU checkpoint and retrieved an annotated PNG. The opt-in Gemini HTTP smoke test remains unverified.
 
 | Phase | Deliverable | Acceptance criteria |
 | --- | --- | --- |

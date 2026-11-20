@@ -131,3 +131,13 @@ See the [dataset audit](notebooks/PALM_DATASETS.md) for the rejected candidates 
 The [Al Ain evaluation report](models/evaluation_report.json) covers 93 held-out images. It reports **97.67% precision**, **96.96% recall**, **99.25% mAP50**, **78.95% mAP50–95**, and **1.70 palms per image counting MAE**. The checkpoint SHA-256 matches the report. Counting MAE measures image tiles. It provides no estimate of whole-farm counting error.
 
 A local CPU smoke test ran the Monitoring Agent through LangGraph on three held-out tiles. It produced annotated PNGs and predicted 13, 6, and 1 palms against 12, 4, and 1 labeled palms. The test left the simulated farm count unchanged.
+
+## FastAPI server
+
+```sh
+python -m pip install -e ".[test,vision]"
+python -m saaf.farms seed
+python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+Open [Swagger UI](http://127.0.0.1:8000/docs) or download the [OpenAPI schema](http://127.0.0.1:8000/openapi.json). The [frontend integration guide](docs/API_INTEGRATION.md) covers sessions, routes, JSON examples, image uploads, CORS, health checks, and the opt-in live test. Use one Uvicorn worker for the MVP's in-memory sessions. Farm and collection records persist in SQLite.

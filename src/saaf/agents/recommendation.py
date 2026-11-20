@@ -2,12 +2,14 @@
 
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from saaf.arabic import normalize
 from saaf.farms import FarmRepository
 from saaf.knowledge.retrieval import DEFAULT_TOP_K, KnowledgeIndex
 from saaf.providers import (
@@ -23,7 +25,11 @@ _SYSTEM_PROMPT = """أنت وكيل توصيات سَعَف. افهم العرب
 scope=general للأسئلة العلمية العامة، وscope=farm للتوصية المخصصة أو سؤال المستخدم عن أرضه.
 outcome=answered عند وجود دليل مباشر، وunsupported عند غيابه أو عند طلب تنبؤ أو ادعاء غير موثق.
 استخدم water_savings عند طلب توفير مياه الري الفعلي أو نسبته، حتى مع وجود سجلات عن رطوبة التربة أو التبخر.
-استخدم farm_dose عند طلب وصفة أو كمية تطبيق لمزرعة بعينها. سؤال الجرعة المرجعية العامة يمكن أن يجيب عنه سجل الجرعة.
+أسئلة الملاءمة أو النصح بالاستخدام (هل يناسب؟ هل تنصحني؟ وش رايك أحط فحم؟) تُجاب بالأدلة والتحذيرات
+ومعطيات التربة والمياه عند توفرها. لا تتعامل معها كطلب جرعة لمجرد ذكر المزرعة أو كلمة «استخدام».
+استخدم farm_dose فقط عند طلب رقم للتطبيق العملي (كم كيلو، ما النسبة، ما الجرعة التي أضيفها).
+سؤال الجرعة المرجعية في الدراسة يمكن أن يجيب عنه سجل الجرعة. إذا جمع السؤال بين الملاءمة وكمية تطبيق
+غير موثقة، اختر السجلات التي تجيب عن الملاءمة واترك كمية التطبيق دون رقم.
 أعد قائمة فارغة عندما لا يوجد سجل يجيب السؤال مباشرة، بما في ذلك water_savings وfarm_dose.
 انتبه إلى اختلاف المحصول والتربة والمادة الخام ونوع التجربة. التشابه الموضوعي وحده لا يكفي.
 طبّق قواعد قاعدة المعرفة التالية:
@@ -31,6 +37,25 @@ outcome=answered عند وجود دليل مباشر، وunsupported عند غي
 
 _FIELD_LIMIT = "نتائج المختبر والصوبة مرتبطة بظروف الدراسة. الجرعة الميدانية وتوفير مياه الري يحتاجان إلى تحقق ميداني."
 _SIMULATED = "استُخدم ملف مزرعة محاكى لأغراض العرض. قيمه تقديرات أو مدخلات محاكاة."
+_BIOCHAR = re.compile(r"فحم|بيوتشار|biochar")
+_SUITABILITY = re.compile(
+    r"ملاءمه|ملايم|يناسب|مناسب|ينفع|يصلح|صلاحيه|هل تنصح(?:ني)? (?:بالفحم|بفحم|باستخدام|باضافه|احط|اضيف|استخدم)|"
+    r"رايك|هل (?:استخدم|اضيف|احط)(?!\s+(?:بنسبه\s+)?\d)|"
+    r"suitab|recommend (?:using|applying|biochar)|should i (?:use|apply)(?!\s+\d)"
+)
+_NUMERICAL_DOSE = re.compile(
+    r"(?:كم|ما|وش|اي)\s+(?:هي\s+)?(?:ال)?(?:جرعه|نسبه|كميه|معدل اضافه|كيلو|كجم|كغ|طن)|"
+    r"كم\s+(?:احط|اضع|اضيف|استخدم)|(?:ما|وش) (?:مقدار|وزن)|"
+    r"(?:حدد|احسب|اعطني|ابغى|ابي)\s+(?:ال)?(?:جرعه|كميه|نسبه)|"
+    r"(?:جرعه|كميه|نسبه) (?:محدده|رقميه)|"
+    r"(?:اضيف|احط|اضع|استخدم|apply)\s+(?:بنسبه\s+)?\d+(?:[.,٫]\d+)?\s*(?:%|٪|كيلو|كجم|كغ|طن|kg)|"
+    r"how much|(?:application )?dosage|what (?:dose|rate|percentage)"
+)
+_STUDY_DOSE = re.compile(r"مرجعي|في (?:الدراسه|التجربه)|اوصى (?:الباحثون|الباحثين)|reference|in the study")
+_PERSONAL_FARM = re.compile(r"مزرعتي|تربتي|ارضي|حقلي|مياه الري عندي|my (?:farm|soil|field)")
+_APPLICATION = re.compile(r"جرعه|اضيف|اضع|احط|اضافه|apply|dosage")
+_SUITABILITY_EVIDENCE = {"bc-02", "bc-03", "bc-04", "bc-06", "bc-08", "bc-09"}
+_DOSE_LIMIT = "الأدلة المتاحة لا تحدد جرعة تطبيق لهذه المزرعة."
 
 Status = Literal["ok", "needs_input", "insufficient_evidence", "unavailable"]
 
@@ -119,9 +144,21 @@ class RecommendationAgent:
             return response("needs_input", "اكتب سؤالاً عن مخلفات النخيل أو الفحم الحيوي.",
                             missing=("السؤال",))
 
+        text = normalize(query)
+        suitability = bool(_SUITABILITY.search(text) and (profile is not None or _BIOCHAR.search(text)))
+        study_dose = bool(_STUDY_DOSE.search(text))
+        numerical_dose = bool(_NUMERICAL_DOSE.search(text) and not study_dose)
         try:
             result = search_scientific_evidence(self.knowledge, query, top_k=self.top_k)
             hits = {hit.record.id: hit for hit in result.hits}
+            if suitability and not hits.keys() & _SUITABILITY_EVIDENCE:
+                followup = search_scientific_evidence(
+                    self.knowledge,
+                    f"{query}\nالفحم الحيوي من سعف النخيل: قوام التربة واحتفاظها بالماء وملوحتها وقلويتها",
+                    top_k=self.top_k,
+                )
+                hits.update((hit.record.id, hit) for hit in followup.hits
+                            if hit.record.id in _SUITABILITY_EVIDENCE)
             farm_context = (
                 profile.model_dump(include={
                     "simulated", "soil_sand_pct", "soil_ph", "irrigation_system",
@@ -150,20 +187,34 @@ class RecommendationAgent:
         if decision.outcome == "water_savings":
             return response("insufficient_evidence", "لا تتوفر قياسات موثقة هنا تحدد مقدار توفير مياه الري. "
                             "نتائج رطوبة التربة والتبخر لا تحدد استهلاك مياه الري في المزرعة.")
-        if decision.outcome == "farm_dose":
-            return response("insufficient_evidence", "الأدلة المتاحة لا تحدد جرعة تطبيق لهذه المزرعة.",
+        if numerical_dose and not suitability and (
+            decision.outcome == "farm_dose" or _BIOCHAR.search(text) or _APPLICATION.search(text)
+        ):
+            return response("insufficient_evidence", _DOSE_LIMIT,
                             recommendation="استشر مختصاً لتقييم التربة والفحم الحيوي وتخطيط تجربة ميدانية.")
-        if decision.outcome == "unsupported":
+        if decision.outcome == "unsupported" and not suitability:
             return response("insufficient_evidence", "لا أملك معلومة موثقة تجيب عن هذا السؤال.")
-        if decision.scope == "farm" and (profile is None or assessment.missing_information):
+        needs_farm = bool(_PERSONAL_FARM.search(text)) if suitability else decision.scope == "farm"
+        if needs_farm and (profile is None or assessment.missing_information):
             return response("needs_input", "أرسل البيانات المطلوبة لاستكمال تقييم ملاءمة الفحم الحيوي.",
                             missing=("معرّف المزرعة",) if profile is None else ())
-        if not decision.record_ids:
+        record_ids = decision.record_ids
+        if suitability:
+            record_ids = [record_id for record_id in record_ids
+                          if record_id in _SUITABILITY_EVIDENCE or (record_id == "bc-05" and study_dose)]
+            if not record_ids:
+                record_ids = [record_id for record_id in hits if record_id in _SUITABILITY_EVIDENCE]
+            if record_ids and profile is not None:
+                if profile.irrigation_water_saline and "bc-08" in hits:
+                    record_ids.append("bc-08")
+                if profile.soil_ph is not None and profile.soil_ph >= 8 and "bc-09" in hits:
+                    record_ids.append("bc-09")
+        if not record_ids:
             return response("insufficient_evidence", "لا أملك معلومة موثقة تجيب عن هذا السؤال.")
 
         citations = []
         paragraphs = []
-        for record_id in dict.fromkeys(decision.record_ids):
+        for record_id in dict.fromkeys(record_ids):
             hit = hits[record_id]
             record, source = hit.record, hit.source
             citations.append(Citation(
@@ -179,8 +230,26 @@ class RecommendationAgent:
                 paragraphs.append(record.caveat_ar)
         recommendation = None
         if any(citation.record_id.startswith("bc-") for citation in citations):
-            paragraphs.append(_FIELD_LIMIT)
+            if suitability:
+                paragraphs.insert(0, "ملاءمة الفحم الحيوي مشروطة بقوام التربة وقلويتها وملوحتها ونظام الري. "
+                                  "توضح الأدلة التالية ما لوحظ في ظروف الدراسة.")
+                paragraphs.append("تحتاج ملاءمة التطبيق في الحقل إلى تحقق ميداني في ظروف مماثلة.")
+                recommendation = "قيّم قوام التربة وقلويتها وملوحة مياه الري قبل التطبيق."
+                if numerical_dose:
+                    paragraphs.append(_DOSE_LIMIT)
+            else:
+                paragraphs.append(_FIELD_LIMIT)
             if profile is not None:
+                if suitability:
+                    properties = []
+                    if profile.soil_sand_pct is not None:
+                        properties.append(f"نسبة الرمل {profile.soil_sand_pct:g}٪")
+                    if profile.soil_ph is not None:
+                        properties.append(f"الرقم الهيدروجيني {profile.soil_ph:g}")
+                    if profile.irrigation_system is not None:
+                        properties.append(f"نظام الري {profile.irrigation_system}")
+                    if properties:
+                        paragraphs.insert(1, "في الملف المحاكى، " + "، ".join(properties) + ".")
                 recommendation = (
                     "راجع قياسات قوام التربة والملوحة مع مختص قبل التطبيق، "
                     f"مع مراعاة نظام الري المسجل في المحاكاة ({profile.irrigation_system or 'غير محدد'})."

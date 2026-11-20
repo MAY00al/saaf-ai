@@ -9,7 +9,8 @@ from .contracts import Capability, Intent
 
 _PATTERNS: dict[Capability, re.Pattern[str]] = {
     "recommendation": re.compile(
-        r"الفحم الحيوي|فحم (?:حيوي|السعف|النخيل)|بيوتشار|biochar|"
+        r"الفحم الحيوي|فحم (?:حيوي|السعف|النخيل)|(?:استخدام|اضافه) الفحم|بيوتشار|biochar|"
+        r"هل (?:الفحم (?:مناسب|ملايم)|(?:يناسب|يصلح) الفحم)|"
         r"قلويه|رطوبه التربه|ملوحه|التبخر|الجرعه|الرقم الهيدروجيني|الفحم.{0,40}التربه|"
         r"كم (?:وزن|كميه) مخلفات|مخلفات النخله|التوصيه العلميه|"
         r"توفير مياه الري|اوفر (?:من )?(?:مويه|مياه)|الدراسات العلميه"
@@ -39,6 +40,22 @@ _AMBIGUOUS = re.compile(r"^(?:كيف ابدا|ساعدني|وش اسوي|ابغ[
 _FOLLOWUP = re.compile(r"^(?:طيب )?(?:وش بعد|وضح اكثر|ممكن توضح|ليه|كيف يعني|وش تقصد|وعن ذا)[.!؟? ]*$")
 INLINE_FARM = re.compile(r"(?<![\w-])SIM-[0-9]+(?![\w-])", re.IGNORECASE | re.ASCII)
 _OTHER_FARM = re.compile(r"(?:مزرعه|المزرعه) (?:ال)?(?:ثانيه|اخرى|جديده|مختلفه)")
+_WASTE_TOTAL = re.compile(
+    r"(?:مخلفات|نفايات|بقايا|مخلف) (?:النخيل|النخل)\b.{0,36}(?:سنوي|بالسنه|في السنه|كل سنه)|"
+    r"(?:مخلفات|نفايات|بقايا) (?:ال)?(?:سنوي\w*|منتجه سنويا)|"
+    r"(?:اجمالي|مجموع|كم|ما|وش) (?:ال)?(?:كميه|وزن) (?:ال)?(?:مخلفات|نفايات) (?:النخيل|النخل)\b|"
+    r"annual (?:estimated )?(?:date )?palm (?:waste|residue)|total (?:date )?palm waste"
+)
+_COLLECTION_TOTAL = re.compile(
+    r"(?:كميه|كميات|وزن|اجمالي) (?:ال)?(?:جمع|استلام|طلبات (?:الجمع|الاستلام))\b|"
+    r"(?:كميه|وزن) (?:التي|اللي) (?:تم جمع|تم استلام|انجمعت|جمعتو)|"
+    r"(?:كميه|كميات|وزن|اجمالي|كم|وش كثر) (?:ال)?(?:مخلفات|سعف|نفايات)\b.{0,36}"
+    r"(?:المجمعه|المستلمه|جمعنا|جمعتو|انجمعت|تم جمع|تم استلام|جمعها)|"
+    r"كم (?:جمعتو|انجمع|استلمتوا|تم جمع)|(?:total|confirmed) (?:collection|collected) (?:quantity|quantities|weight|waste)|"
+    r"how much (?:palm )?waste (?:was |has been )?collected|\bcollection (?:quantity|quantities|totals)\b"
+)
+_SCIENTIFIC_REQUEST = re.compile(r"فحم|biochar|توصي|جرعه|ملوحه|قلويه|رطوبه|التبخر|دراس")
+_PICKUP_ACTION = re.compile(r"\b(?:استلم|اجمع|انقل|موعد|شاحنه|تشلون|ابغى|ابي|احجز|الغ|الغاء)\b")
 
 
 def classify(query: str, previous_intent: Capability | None = None) -> tuple[Intent, tuple[Capability, ...]]:
@@ -51,6 +68,13 @@ def classify(query: str, previous_intent: Capability | None = None) -> tuple[Int
     indicators = requested_indicators(text)
     if REQUEST_ID.search(query):
         candidates_found.add("collection")
+    aggregate = bool(_WASTE_TOTAL.search(text) or _COLLECTION_TOTAL.search(text))
+    if aggregate:
+        candidates_found.add("impact")
+        if not _SCIENTIFIC_REQUEST.search(text):
+            candidates_found.discard("recommendation")
+        if not _PICKUP_ACTION.search(text) and not REQUEST_ID.search(query):
+            candidates_found.discard("collection")
     explicit_water_report = "water_savings" in indicators and bool(re.search(r"احسب|قدر|تقرير", text))
     if any(item != "water_savings" for item in indicators) or is_environmental_query(text) or explicit_water_report:
         candidates_found.add("impact")

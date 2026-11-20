@@ -16,7 +16,7 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 # Retrieval and model choices are injected to exercise the guards offline.
 SCENARIOS = [
     ("ما أثر الفحم في التربة الرملية اللومية؟", None, "general", "answered", "bc-02", "ok"),
-    ("هل يناسب الفحم أرضي الرملية؟", "SIM-015", "farm", "answered", "bc-05", "ok"),
+    ("هل يناسب الفحم أرضي الرملية؟", "SIM-015", "farm", "answered", "bc-02", "ok"),
     ("وش رايك أحط فحم وتربتي قلوية؟", "SIM-001", "farm", "answered", "bc-09", "ok"),
     ("أنا أسقي بموية مالحة، وش الاحتياط؟", "SIM-002", "farm", "answered", "bc-08", "ok"),
     ("ما الجرعة المرجعية وزناً للتربة الرملية؟", None, "general", "answered", "bc-05", "ok"),
@@ -125,6 +125,75 @@ def test_missing_attributes_prompt_for_data(farms):
     assert len(result.missing_information) == 4
     assert not result.warnings
     assert get_farm_profile(farms, "SIM-001").soil_ph is None
+
+
+@pytest.mark.parametrize("query", [
+    "هل الفحم الحيوي مناسب للتربة الرملية؟",
+    "وش رايك أحط فحم حيوي بالتربة الرملية؟",
+    "هل تنصح باستخدام الفحم الحيوي؟",
+    "Is biochar suitable for sandy soil?",
+])
+def test_general_suitability_recovers_from_dose_misclassification(farms, query):
+    chat = FixtureChat("farm", "farm_dose", [])
+    result = RecommendationAgent(FixtureKnowledge(["bc-02"]), farms, chat).recommend(query)
+    assert result.status == "ok"
+    assert [citation.record_id for citation in result.sources] == ["bc-02"]
+    assert "ملاءمة الفحم الحيوي مشروطة" in result.answer_ar
+    assert "جرعة" not in result.answer_ar
+    assert result.recommendation and not result.missing_information
+
+
+def test_farm_suitability_uses_properties_and_qualified_evidence(farms):
+    chat = FixtureChat("farm", "farm_dose", [])
+    result = RecommendationAgent(FixtureKnowledge(["bc-02", "bc-08", "bc-09"]), farms, chat).recommend(
+        "هل تنصح باستخدام الفحم الحيوي في مزرعتي؟", "SIM-002",
+    )
+    assert result.status == "ok" and result.simulated_data
+    assert "85٪" in result.answer_ar and "8.4" in result.answer_ar
+    assert any("قلوية" in warning for warning in result.warnings)
+    assert any("مالحة" in warning for warning in result.warnings)
+    assert "الكونوكاربس" in result.answer_ar
+
+
+def test_mixed_suitability_and_dose_answers_suitability_only(farms):
+    chat = FixtureChat("farm", "farm_dose", [])
+    result = RecommendationAgent(FixtureKnowledge(["bc-02", "bc-05"]), farms, chat).recommend(
+        "هل يناسب الفحم الحيوي مزرعتي وكم كيلو أضيف؟", "SIM-002",
+    )
+    assert result.status == "ok"
+    assert [citation.record_id for citation in result.sources] == ["bc-02"]
+    assert "لا تحدد جرعة تطبيق" in result.answer_ar
+    assert "تحتاج ملاءمة التطبيق في الحقل إلى تحقق" in result.answer_ar
+
+
+def test_numerical_farm_dose_stays_blocked_if_model_selects_reference(farms):
+    chat = FixtureChat("farm", "answered", ["bc-05"])
+    result = RecommendationAgent(FixtureKnowledge(["bc-05"]), farms, chat).recommend(
+        "كم كيلو من الفحم الحيوي أضيف لمزرعتي؟", "SIM-002",
+    )
+    assert result.status == "insufficient_evidence" and not result.sources
+
+
+def test_suitability_search_expands_when_initial_hits_only_cover_dosage(farms):
+    class SuitabilityKnowledge(FixtureKnowledge):
+        def search(self, query, *, top_k):
+            target = "bc-02" if "\n" in query else "bc-05"
+            hits = tuple(hit for hit in self.hits if hit.record.id == target)
+            return SearchResult("ok", hits)
+
+    result = RecommendationAgent(
+        SuitabilityKnowledge(["bc-02", "bc-05"]), farms, FixtureChat("general", "farm_dose", []),
+    ).recommend("هل يناسب الفحم الحيوي التربة الرملية؟")
+    assert result.status == "ok"
+    assert [citation.record_id for citation in result.sources] == ["bc-02"]
+
+
+def test_soil_percentage_is_context_not_a_dosage_request(farms):
+    result = RecommendationAgent(
+        FixtureKnowledge(["bc-02"]), farms, FixtureChat("farm", "farm_dose", []),
+    ).recommend("هل الفحم الحيوي مناسب لتربة فيها 85% رمل؟")
+    assert result.status == "ok"
+    assert "جرعة" not in result.answer_ar
 
 
 def test_rejects_unretrieved_citation_even_if_id_exists(farms):

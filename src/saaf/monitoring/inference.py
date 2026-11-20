@@ -62,7 +62,8 @@ def load_image(path: Path):
             raise InvalidImage("image file is too large")
         with Image.open(BytesIO(content), formats=("JPEG", "PNG")) as source:
             width, height = source.size
-            if min(width, height) < 32 or width * height > _MAX_PIXELS or source.n_frames != 1:
+            # Pillow's ordinary JPEG reader may not expose frame metadata.
+            if min(width, height) < 32 or width * height > _MAX_PIXELS or getattr(source, "n_frames", 1) != 1:
                 raise InvalidImage("unsupported image dimensions or frame count")
             source.load()
             return ImageOps.exif_transpose(source).convert("RGB"), sha256(content).hexdigest()

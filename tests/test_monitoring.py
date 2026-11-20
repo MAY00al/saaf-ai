@@ -51,6 +51,17 @@ def test_image_validation(tmp_path, services):
             load_image(path)
 
 
+def test_image_validation_distinguishes_jpeg_and_multiframe_png(tmp_path):
+    image = Image.new("RGB", (64, 48), "white")
+    jpeg = tmp_path / "single.jpg"
+    image.save(jpeg)
+    assert load_image(jpeg)[0].size == (64, 48)
+    animated = tmp_path / "animated.png"
+    image.save(animated, save_all=True, append_images=[Image.new("RGB", image.size, "black")])
+    with pytest.raises(InvalidImage, match="frame count"):
+        load_image(animated)
+
+
 def test_prediction_processing_estimate_and_annotation(services):
     farms, settings, image = services
     result = MonitoringAgent(farms, settings, Detector()).inspect_palms("SIM-001", image)
