@@ -2,7 +2,24 @@
 
 SAAF is an Arabic-first AI platform for date palm residue management, evidence-grounded biochar recommendations, collection planning, environmental impact assessment, and palm monitoring.
 
-SAAF supports Arabic scientific retrieval, simulated farm profiles, recommendations, LangGraph routing, simulated collection requests, impact reporting, and local palm monitoring with configured weights. Phase 7 requires owner approval.
+SAAF supports Arabic scientific retrieval, simulated farm profiles, recommendations, LangGraph routing, simulated collection requests, impact reporting, local palm monitoring, and geospatial analysis through FastAPI. Live Sentinel‑2 endpoint verification is pending.
+
+## Team local setup
+
+Ask the owner for GitHub collaborator access to the private team repository. Clone using its GitHub HTTPS or SSH URL and run the backend from the repository root. On Windows PowerShell:
+
+```powershell
+git clone PRIVATE_REPOSITORY_URL saaf-ai
+Set-Location saaf-ai
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[test,vision,satellite]"
+Copy-Item .env.example .env
+python -m saaf.farms seed
+python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+Use Python 3.11 or newer. On macOS or Linux, use `python3 -m venv .venv`, `source .venv/bin/activate`, and `cp .env.example .env`. Copy the template only on first setup. Keep your credentials in the backend's local `.env`. If you change `SAAF_SQLITE_PATH`, pass the same path to the seed command with `--db`. Start with one worker and open [Swagger UI](http://127.0.0.1:8000/docs). See the [team smoke tests](docs/API_INTEGRATION.md#team-smoke-tests) for each agent and the [frontend guide](docs/FRONTEND_GUIDE.md) before starting UI work.
 
 | Input | Intended use |
 | --- | --- |
@@ -112,7 +129,7 @@ Requests such as `كم الانبعاثات المتجنبة؟` return `insuffic
 
 ### Local CPU palm monitoring
 
-Install with `python -m pip install -e ".[vision]"`. The local Al Ain checkpoint is `models/best.pt`. The workspace `.env` points to it and uses the report's settings of 0.25 confidence, 640-pixel inference size, and 3,000 maximum detections. For other environments, set these values using [.env.example](.env.example). Keep checkpoints outside Git and load only trusted weights.
+Install with `python -m pip install -e ".[vision]"`. The private team clone includes the trusted Al Ain checkpoint at `models/best.pt` for the permitted educational hackathon use. [.env.example](.env.example) configures that path relative to the repository root and uses the report's settings of 0.25 confidence, 640-pixel inference size, and 3,000 maximum detections. If you already have a local `.env`, set `SAAF_PALM_WEIGHTS=models/best.pt` in it. Verify the checkout with `Get-FileHash models/best.pt -Algorithm SHA256` (PowerShell) or `shasum -a 256 models/best.pt` (macOS/Linux) and compare with `weights_sha256` in the [evaluation report](models/evaluation_report.json).
 
 ```sh
 python -m saaf.orchestration "رصد النخيل" --farm-id SIM-001 --image "datasets/demo/aerial.jpg"
@@ -126,7 +143,7 @@ To review a count for storage, open the interactive CLI, select `/farm SIM-001`,
 
 Open the [Colab notebook](notebooks/train_palm_yolo_colab.ipynb) in a GPU runtime. Review the [Al Ain dataset terms](https://github.com/NourO93/Palm-Tree-Dataset) and set `HACKATHON_USE_COMPLIES = True` only after confirming the intended use meets the research and education restriction. The notebook downloads the pinned archive, excludes unlabeled images, validates and converts the 922 annotated TIFFs, and creates a 737/92/93 experimental split. Enable `RUN_GPU_TRAINING` to fine-tune YOLO11n. The notebook visualizes test predictions and downloads `best.pt` and the evaluation report.
 
-See the [dataset audit](notebooks/PALM_DATASETS.md) for the rejected candidates and split limitations. Spatial independence is unverified, so metrics apply only to this experimental split. Keep datasets, weights, and run artifacts outside Git.
+See the [dataset audit](notebooks/PALM_DATASETS.md) for the rejected candidates and split limitations. Spatial independence is unverified, so metrics apply only to this experimental split. The reviewed team checkpoint and evaluation report are the only model artifacts intended for Git. Keep datasets and training outputs out of Git.
 
 The [Al Ain evaluation report](models/evaluation_report.json) covers 93 held-out images. It reports **97.67% precision**, **96.96% recall**, **99.25% mAP50**, **78.95% mAP50–95**, and **1.70 palms per image counting MAE**. The checkpoint SHA-256 matches the report. Counting MAE measures image tiles. It provides no estimate of whole-farm counting error.
 

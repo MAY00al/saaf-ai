@@ -4,15 +4,23 @@ The local server listens on `http://127.0.0.1:8000`. API routes use `/api/v1`. S
 
 ## Local startup
 
-Run from the repository root in an activated Python 3.11+ virtual environment.
+Accept the private GitHub invitation, clone the team repository, and run from its root in a Python 3.11+ virtual environment. Follow the [team setup commands](../README.md#team-local-setup) to create and activate the environment and copy `.env.example` to `.env`.
 
 ```sh
-python -m pip install -e ".[test,vision]"
+python -m pip install -e ".[test,vision,satellite]"
 python -m saaf.farms seed
 python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Set server options in `.env` using `.env.example`. If you override the SQLite path in `.env`, pass that same path to `python -m saaf.farms seed --db PATH`. Set `SAAF_CORS_ORIGINS` to the comma-separated frontend origins, including their ports. Defaults include `http://localhost:5173` and `http://127.0.0.1:5173`. Provider credentials belong in the backend environment. Recommendation uses the configured chat and embedding providers. Impact reports have an offline Arabic fallback. Monitoring uses the configured local checkpoint.
+Set server options in `.env` using `.env.example`. If you override the SQLite path in `.env`, pass that same path to `python -m saaf.farms seed --db PATH`. Set `SAAF_CORS_ORIGINS` to the comma-separated frontend origins, including their ports. Defaults include `http://localhost:5173` and `http://127.0.0.1:5173`. Provider credentials belong in the backend environment. Impact reports have an offline Arabic fallback. The template points monitoring to the trusted `models/best.pt` from the private clone. Start frontend work on `feat/frontend` in `frontend/` using the [frontend guide](FRONTEND_GUIDE.md).
+
+## Team smoke tests
+
+1. Run `python -m pytest -q` for offline regression coverage. In Swagger, check `GET /health/ready`, list farms, and create a session using `POST /api/v1/sessions`. Use a disposable local database when confirming changes.
+2. For real recommendations, create your own [Gemini API key](https://aistudio.google.com/apikey). Set `GOOGLE_API_KEY`, `SAAF_CHAT_PROVIDER=gemini`, and `SAAF_EMBEDDING_PROVIDER=gemini` in `.env`. Leave model overrides empty unless needed, then restart. Send a chat question for `SIM-002`, such as «هل البيوشار مناسب لتربة مزرعتي؟», and inspect returned citations and warnings. For a focused RAG and citation check, run `python -m pytest -q tests/live_api.py`. This test makes real provider calls. An offline pass does not verify Gemini availability or quota.
+3. Propose a collection for `SIM-001` with the example below, submit the exact returned draft after reviewing it, and verify the saved request through the farm's collection endpoints. Use `GET /api/v1/impact` to see the confirmed quantity and `POST /api/v1/impact/assess` to verify the missing-data state for avoided emissions.
+4. Upload an authorized aerial JPEG or PNG using the raw-body endpoint. Confirm the response contains detections and an annotated image URL. Keep `whole_farm` off to exercise inference without changing the farm count.
+5. Preview area and register a polygon using the [Swagger walkthrough](#swagger-walkthrough-using-public-agricultural-coordinates). For live Sentinel‑2 requests, each developer runs `earthengine authenticate` under their own Google account and sets `SAAF_EE_PROJECT` to a registered project they can use. Restart the API. Run the three Swagger satellite modes or the opt-in `python -m pytest -q -s tests/live_earth_engine.py`. Project initialization was verified previously. Live imagery, NDVI previews, and history through FastAPI remain pending verification.
 
 This is a single-worker, loopback MVP with a shared simulated registry. Sessions are in memory, expire after one hour of inactivity by default, and disappear on restart. The server keeps at most eight recent annotations per session. The session ID grants access to that session's context and images. Treat it as private. Add authentication and authorization before exposing the service beyond trusted local callers.
 

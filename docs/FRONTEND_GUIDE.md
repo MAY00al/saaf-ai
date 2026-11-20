@@ -4,25 +4,25 @@ SAAF (سَعَف) is an Arabic-first platform for date palm farmers and farm man
 
 ## Local setup
 
-Clone using the repository URL supplied by the owner. Run the following from PowerShell with Python 3.11 or newer and Git installed. Replace `OWNER_REPOSITORY_URL` with that URL.
+Accept the private GitHub repository invitation and clone using the URL supplied by the owner. Run the following from PowerShell with Python 3.11 or newer and Git installed. Replace `OWNER_REPOSITORY_URL` with that URL.
 
 ```powershell
 git clone OWNER_REPOSITORY_URL saaf-ai
 Set-Location saaf-ai
 git switch -c feat/frontend
-py -3.11 -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[test,vision,satellite]"
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-The backend uses FastAPI and Uvicorn, SQLite, LangGraph, LangChain, and ChromaDB. The `test` extra adds the test tooling, `vision` adds the YOLO runtime, and `satellite` adds Earth Engine support. Use only the extras needed for the flows being developed.
+On macOS/Linux use `python3 -m venv .venv`, `source .venv/bin/activate`, and copy `.env.example` to `.env` only if `.env` is missing. The backend uses FastAPI and Uvicorn, SQLite, LangGraph, LangChain, and ChromaDB. The `test` extra adds the test tooling, `vision` adds the YOLO runtime, and `satellite` adds Earth Engine support.
 
 | Backend configuration | Setup |
 | --- | --- |
 | Database | `SAAF_SQLITE_PATH` defaults to `var/saaf.sqlite3`. If you change it, pass the same path to the seed command with `--db`. Seeding adds the 20 simulated profiles without duplicating them or overwriting local edits. |
 | Scientific retrieval | Set `SAAF_CHAT_PROVIDER` and `SAAF_EMBEDDING_PROVIDER` independently to `openai` or `gemini`. Set the corresponding `OPENAI_API_KEY` or `GOOGLE_API_KEY` in the backend. Optional model overrides are `SAAF_CHAT_MODEL` and `SAAF_EMBEDDING_MODEL`. Use the repository's index rebuild workflow when switching embeddings. [Live retrieval setup](../README.md#live-retrieval) |
-| Palm detection | Obtain the trusted Al Ain `best.pt` checkpoint through an owner-approved private channel, verify its SHA‑256 against the evaluation report, and set `SAAF_PALM_WEIGHTS=models/best.pt` or an absolute local path. The documented inference settings are confidence `0.25`, image size `640`, and detection cap `3000`. Review dataset-use terms before distributing weights or data. [CPU monitoring setup](../README.md#local-cpu-palm-monitoring) |
+| Palm detection | Use the trusted `models/best.pt` from the private clone and verify its SHA‑256 against the evaluation report. The template already sets `SAAF_PALM_WEIGHTS=models/best.pt`. Run from the repository root. Keep the checkpoint within the authorized educational team. [CPU monitoring setup](../README.md#local-cpu-palm-monitoring) |
 | Satellite | Set `SAAF_EE_PROJECT` to a registered project and authenticate for the account running the backend. If using service-account credentials, point `SAAF_EE_SERVICE_ACCOUNT_FILE` at a private local file. [Earth Engine setup](../README.md#farm-boundaries-and-satellite-monitoring) |
 | CORS | `SAAF_CORS_ORIGINS` accepts a comma-separated list of exact origins with scheme and port. The defaults are `http://localhost:5173,http://127.0.0.1:5173`. Set the actual frontend origin when using a different port and restart the backend. |
 
@@ -31,7 +31,7 @@ python -m saaf.farms seed
 python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Use one worker. Check [liveness](http://127.0.0.1:8000/health/live) and [readiness](http://127.0.0.1:8000/health/ready). Readiness checks SQLite and reports checkpoint presence. Smoke-test individual integrations separately. In [Swagger UI](http://127.0.0.1:8000/docs), use **Try it out** to confirm request bodies, response codes, and enum values. Use the [OpenAPI schema](http://127.0.0.1:8000/openapi.json) to generate client types and [ReDoc](http://127.0.0.1:8000/redoc) to browse the contract. The browser needs only the public API base URL. Keep `.env`, credentials, and checkpoints outside Git and out of client bundles and static assets.
+Use one worker. Check [liveness](http://127.0.0.1:8000/health/live) and [readiness](http://127.0.0.1:8000/health/ready). Readiness checks SQLite and reports checkpoint presence. Run the [team smoke tests](API_INTEGRATION.md#team-smoke-tests) to verify each service. In [Swagger UI](http://127.0.0.1:8000/docs), use **Try it out** to confirm request bodies, response codes, and enum values. Use the [OpenAPI schema](http://127.0.0.1:8000/openapi.json) to generate client types and [ReDoc](http://127.0.0.1:8000/redoc) to browse the contract. The browser needs only the API base URL. Keep `.env` and credentials out of Git, and keep credentials and model weights out of client bundles and static assets.
 
 ## Farmer journey
 
