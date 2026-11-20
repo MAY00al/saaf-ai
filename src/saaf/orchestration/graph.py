@@ -5,9 +5,12 @@ from pydantic import TypeAdapter
 
 from saaf.agents.recommendation import RecommendationResponse
 from saaf.agents.tools import FarmId
+from saaf.collection.commands import confirmation_action, has_quantity_input
 from saaf.providers import RATE_LIMIT_AR, is_rate_limited
 
-from .contracts import AgentState, ConversationContext, OrchestrationResponse, RecommendationPort
+from .contracts import (
+    AgentState, CollectionPort, ConversationContext, ImpactPort, OrchestrationResponse, RecommendationPort,
+)
 from .routing import INLINE_FARM, classify, is_followup, mentions_other_farm
 
 _FARM_ID = TypeAdapter(FarmId)
@@ -36,22 +39,33 @@ def _route(state: AgentState) -> AgentState:
         }
 
     active_id = next(iter(inline_ids), context.farm_id)
+    first_farm_selection = context.farm_id is None and context.previous_intent == "collection"
     if active_id != context.farm_id:
         context = ConversationContext(farm_id=active_id)
+    collection_continuing = context.previous_intent == "collection" or first_farm_selection
     intent, candidates = classify(query, context.previous_intent)
+    if confirmation_action(query) == "confirm" or (
+        confirmation_action(query) == "decline" and (collection_continuing or context.pickup_draft)
+    ):
+        intent, candidates = "collection", ("collection",)
+    elif collection_continuing and intent == "unsupported" and (
+        has_quantity_input(query) or INLINE_FARM.fullmatch(query.strip())
+    ):
+        intent, candidates = "collection", ("collection",)
     agent_query = query
     if intent == "recommendation" and is_followup(query) and context.previous_query:
         agent_query = f"السؤال السابق: {context.previous_query}\nالسؤال الحالي: {query}"
     if candidates and intent != "clarification" and not is_followup(query):
         context = ConversationContext(
             farm_id=active_id, previous_query=query, previous_intent=candidates[0],
+            pickup_draft=context.pickup_draft,
         )
     elif intent in {"clarification", "unsupported"}:
         # Avoid resolving a later vague follow-up using an abandoned request.
         context = ConversationContext(farm_id=active_id)
     return {
         "intent": intent, "candidate_intents": candidates, "context": context,
-        "agent_query": agent_query,
+        "agent_query": agent_query, "collection_continuing": collection_continuing,
     }
 
 
@@ -83,20 +97,77 @@ def _respond_without_agent(state: AgentState) -> AgentState:
 class Orchestrator:
     """Route each turn once using context supplied explicitly by the caller."""
 
-    def __init__(self, recommendation: RecommendationPort) -> None:
+    def __init__(
+        self, recommendation: RecommendationPort, *, collection: CollectionPort | None = None,
+        impact: ImpactPort | None = None,
+    ) -> None:
         self.recommendation = recommendation
+        self.collection = collection
+        self.impact = impact
         graph = StateGraph(AgentState)
         graph.add_node("route", _route)
         graph.add_node("recommend", self._recommend)
+        graph.add_node("collect", self._collect)
+        graph.add_node("impact_report", self._impact)
         graph.add_node("respond", _respond_without_agent)
         graph.add_edge(START, "route")
         graph.add_conditional_edges(
-            "route", lambda state: state["intent"] == "recommendation",
-            {True: "recommend", False: "respond"},
+            "route", self._dispatch,
+            {"recommend": "recommend", "collect": "collect",
+             "impact_report": "impact_report", "respond": "respond"},
         )
         graph.add_edge("recommend", END)
+        graph.add_edge("collect", END)
+        graph.add_edge("impact_report", END)
         graph.add_edge("respond", END)
         self._graph = graph.compile()
+
+    def _dispatch(self, state: AgentState) -> str:
+        intent = state["intent"]
+        if intent == "recommendation":
+            return "recommend"
+        if intent == "collection" and self.collection is not None:
+            return "collect"
+        if intent == "impact" and self.impact is not None:
+            return "impact_report"
+        return "respond"
+
+    def _collect(self, state: AgentState) -> AgentState:
+        context = state["context"]
+        candidates = state["candidate_intents"]
+        try:
+            result = self.collection.plan_collection(
+                state["query"], context.farm_id, context.pickup_draft,
+                continuing=state["collection_continuing"],
+            )
+            records = (result.draft, result.request, *result.requests)
+            if any(record and record.farm_id != context.farm_id for record in records):
+                raise ValueError("collection result returned a different farm")
+        except Exception:
+            return {"response": OrchestrationResponse(
+                intent="collection", status="unavailable", context=context, candidate_intents=candidates,
+                answer_ar="تعذّر الوصول إلى سجل الجمع المحاكى حالياً. حاول مرة أخرى لاحقاً.",
+            )}
+        context = context.model_copy(update={"pickup_draft": result.draft})
+        return {"response": OrchestrationResponse(
+            intent="collection", status=result.status, context=context, answer_ar=result.answer_ar,
+            candidate_intents=candidates, collection=result,
+        )}
+
+    def _impact(self, state: AgentState) -> AgentState:
+        context = state["context"]
+        candidates = state["candidate_intents"]
+        try:
+            result = self.impact.estimate_impact(state["agent_query"])
+        except Exception:
+            return {"response": OrchestrationResponse(
+                intent="impact", status="unavailable", context=context, candidate_intents=candidates,
+                answer_ar="تعذّر إعداد تقرير المحاكاة حالياً. حاول مرة أخرى لاحقاً.",
+            )}
+        return {"response": OrchestrationResponse(
+            intent="impact", status=result.status, context=context, answer_ar=result.answer_ar,
+            candidate_intents=candidates, impact=result,
+        )}
 
     def _recommend(self, state: AgentState) -> AgentState:
         context = state["context"]

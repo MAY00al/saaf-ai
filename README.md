@@ -2,7 +2,7 @@
 
 SAAF is an Arabic-first AI platform for date palm residue management, evidence-grounded biochar recommendations, collection planning, environmental impact assessment, and palm monitoring.
 
-Phase 1 provides Arabic scientific retrieval. Phase 2 adds a SQLite repository for simulated farm profiles. Phase 3 adds the Arabic recommendation agent. Phase 4 adds LangGraph orchestration. Phase 5 requires owner approval.
+SAAF supports Arabic scientific retrieval, simulated farm profiles, recommendations, LangGraph routing, simulated collection requests, and impact reporting. Phase 6 requires owner approval.
 
 | Input | Intended use |
 | --- | --- |
@@ -92,4 +92,20 @@ python -m pytest -q tests/live_orchestration.py
 
 The interactive CLI keeps the active farm and last supported request in memory. Use `/farm ID` to select a farm for the next turn, `/reset` to clear context, and `/exit` to quit. An inline `SIM-NNN` also supplies the farm ID. A switch to another farm clears the previous question. Conflicting IDs and multi-intent requests ask for clarification.
 
-Routing uses normalized Arabic phrases and selected Saudi expressions. Only the recommendation route initializes an AI provider. Collection, monitoring, and environmental impact return `not_implemented`. The routing benchmark measures exact intent and candidate matching on the included labeled examples. It makes no API calls and does not measure answer quality. The explicit live test uses the configured providers and is excluded from the default suite.
+Routing uses normalized Arabic phrases and selected Saudi expressions. Recommendation uses the configured providers. Impact can use the chat provider to select an explanation of computed results and falls back to a deterministic Arabic explanation. Monitoring returns `not_implemented`. The routing benchmark measures intent and candidate matching on the labeled examples. The explicit live test is excluded from the default suite.
+
+### Simulated collection
+
+Seed farms and open `python -m saaf.orchestration` for multi-turn confirmation.
+
+1. Enter `أبغى طلب جمع للسعف`, then supply a farm ID such as `SIM-001`.
+2. Enter the requested pickup amount, for example `٣٠٠ كجم`. The annual waste estimate appears separately. Quantities use positive whole kilograms.
+3. Review the simulated date and quantity. Enter `أؤكد` to save or `إلغاء المسودة` to discard. Use `طلباتي` or `تتبع الطلب COL-…` to retrieve requests for the active farm. To cancel a saved request, enter `إلغاء الطلب COL-…` with its full ID.
+
+Demo pickups use the next future Monday, Wednesday, or Saturday in Riyadh time. No carrier or dispatch service is connected. Drafts are session state. Confirmed and cancelled requests persist in SQLite. An identical farm, date, and quantity resolves to the existing record, including after cancellation.
+
+### Impact reporting
+
+Ask `وش إجمالي الطلبات حسب المنطقة؟` for the registry and request breakdown, or `كم الكمية المؤكدة في القصيم؟` for a regional report. Reports distinguish estimated annual waste from user-entered quantities on confirmed demo requests. A confirmation represents a recorded request and carries no field fulfillment data.
+
+Requests such as `كم الانبعاثات المتجنبة؟` return `insufficient_data` with the required measurements and factors. The current datasets supply no validated inputs for biochar production, stored carbon, avoided emissions, or measured irrigation savings.

@@ -4,9 +4,12 @@ import argparse
 from functools import cached_property
 from pathlib import Path
 
+from saaf.agents.collection import CollectionAgent
+from saaf.agents.impact import ImpactAgent, ImpactExplanation
 from saaf.agents.recommendation import RecommendationResponse, build_agent
+from saaf.collection.repository import CollectionRepository
 from saaf.farms import FarmRepository
-from saaf.providers import load_environment
+from saaf.providers import build_structured_chat, chat_config, load_environment
 
 from .contracts import ConversationContext
 from .evaluation import evaluate_routing
@@ -22,6 +25,15 @@ class LiveRecommendation:
         return self.agent.recommend(query, farm_id)
 
 
+class LiveImpactExplanation:
+    @cached_property
+    def model(self):
+        return build_structured_chat(chat_config(), ImpactExplanation)
+
+    def invoke(self, messages):
+        return self.model.invoke(messages)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query", nargs="?")
@@ -32,7 +44,12 @@ def main() -> None:
         print(evaluate_routing().model_dump_json(indent=2))
         return
     load_environment()
-    orchestrator = Orchestrator(LiveRecommendation())
+    farms = FarmRepository()
+    requests = CollectionRepository(farms)
+    orchestrator = Orchestrator(
+        LiveRecommendation(), collection=CollectionAgent(farms, requests),
+        impact=ImpactAgent(farms, requests, LiveImpactExplanation()),
+    )
     if args.query is not None:
         print(orchestrator.run(args.query, farm_id=args.farm_id).model_dump_json(indent=2))
         return

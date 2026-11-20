@@ -5,11 +5,16 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypedDict
 
+from saaf.agents.impact import ImpactResult
 from saaf.agents.recommendation import RecommendationResponse
+from saaf.collection.models import CollectionResult, PickupDraft
 
 Capability = Literal["recommendation", "collection", "monitoring", "impact"]
 Intent = Literal["recommendation", "collection", "monitoring", "impact", "clarification", "unsupported"]
-Outcome = Literal["ok", "needs_input", "insufficient_evidence", "unavailable", "not_implemented", "unsupported"]
+Outcome = Literal[
+    "ok", "needs_input", "insufficient_evidence", "insufficient_data", "unavailable",
+    "not_implemented", "unsupported", "awaiting_confirmation", "not_found",
+]
 
 
 class ConversationContext(BaseModel):
@@ -18,6 +23,7 @@ class ConversationContext(BaseModel):
     farm_id: str | None = None
     previous_query: str | None = Field(default=None, max_length=4000)
     previous_intent: Capability | None = None
+    pickup_draft: PickupDraft | None = None
 
 
 class OrchestrationResponse(BaseModel):
@@ -27,6 +33,8 @@ class OrchestrationResponse(BaseModel):
     context: ConversationContext
     candidate_intents: tuple[Capability, ...] = ()
     recommendation: RecommendationResponse | None = None
+    collection: CollectionResult | None = None
+    impact: ImpactResult | None = None
 
 
 class AgentState(TypedDict, total=False):
@@ -37,6 +45,7 @@ class AgentState(TypedDict, total=False):
     candidate_intents: tuple[Capability, ...]
     clarification_ar: str | None
     agent_query: str
+    collection_continuing: bool
     response: OrchestrationResponse
 
 
@@ -52,7 +61,10 @@ class FutureAgentRequest(BaseModel):
 
 
 class CollectionPort(Protocol):
-    def plan_collection(self, request: FutureAgentRequest) -> OrchestrationResponse: ...
+    def plan_collection(
+        self, query: str, farm_id: str | None, draft: PickupDraft | None = None,
+        *, continuing: bool = False,
+    ) -> CollectionResult: ...
 
 
 class MonitoringPort(Protocol):
@@ -60,4 +72,4 @@ class MonitoringPort(Protocol):
 
 
 class ImpactPort(Protocol):
-    def estimate_impact(self, request: FutureAgentRequest) -> OrchestrationResponse: ...
+    def estimate_impact(self, query: str, *, region: str | None = None) -> ImpactResult: ...

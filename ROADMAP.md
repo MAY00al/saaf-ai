@@ -1,10 +1,12 @@
 # Implementation roadmap
 
-Phase 0 delivered the architecture and repository scaffold. Phase 1 implements scientific retrieval. Phase 2 implements the simulated farm repository. Phase 3 implements the Arabic recommendation agent with configurable OpenAI or Gemini chat and embeddings. Phase 4 implements LangGraph routing, scoped conversation context, and validated tool boundaries. See [README.md](README.md) for offline and live commands. Phase 5 requires owner approval.
+Phases 0–4 delivered the scaffold, scientific retrieval, farm repository, recommendation agent, and LangGraph routing. Phase 5 adds simulated collection confirmation and deterministic impact reporting. See [README.md](README.md) for CLI workflows and tests. Phase 6 requires owner approval.
 
 Phase 3 verification passed 61 offline tests and one live Gemini integration test covering a cited Saudi dialect query and an unsupported irrigation-savings request. Corpus-wide live retrieval calibration remains open.
 
 Phase 4 verification matched all 28 labeled routing cases. The offline integration tests verify status, citation and provenance preservation, and provider error handling separately. Broader dialect coverage and live answer quality were outside that benchmark.
+
+Phase 5 verification passed 118 offline tests, including the earlier regression suites, concurrent duplicate confirmation, farm-scoped tracking, regional aggregates, and environmental data-gap responses.
 
 | Phase | Deliverable | Acceptance criteria |
 | --- | --- | --- |

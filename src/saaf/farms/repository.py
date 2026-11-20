@@ -65,6 +65,7 @@ class FarmRepository:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     def seed(self, path: Path = DEFAULT_SEED_PATH) -> int:
