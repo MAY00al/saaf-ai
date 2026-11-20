@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-Phases 0–6 delivered the scaffold, scientific retrieval, farm repository, recommendation, routing, collection, impact, and palm monitoring. Phase 7 integrates all four agents into the FastAPI application and documents the local HTTP interface. See the [frontend integration guide](docs/API_INTEGRATION.md).
+Phases 0–7 delivered the scaffold, scientific retrieval, farm repository, recommendation, routing, collection, impact, palm monitoring, and FastAPI. Phase 8 adds user-defined boundaries and optional Earth Engine vegetation monitoring. See the [frontend integration guide](docs/API_INTEGRATION.md).
 
 Phase 3 verification passed 61 offline tests and one live Gemini integration test covering a cited Saudi dialect query and an unsupported irrigation-savings request. Corpus-wide live retrieval calibration remains open.
 
@@ -14,6 +14,10 @@ The trained checkpoint passed local CPU inference through LangGraph on three hel
 
 Phase 7 verification passed 131 offline tests, including HTTP flows for all four agents. A separate local HTTP smoke test loaded the trained CPU checkpoint and retrieved an annotated PNG. The opt-in Gemini HTTP smoke test remains unverified.
 
+Phase 8 verification passed 164 offline tests. A separate check serialized the Earth Engine computation graph and validated preview handling with SDK doubles. The registered noncommercial `saaf-ai` project passed CLI authentication and an authenticated Earth Engine initialization probe. Live imagery, NDVI previews, and history through FastAPI still need the Broadbalk smoke test.
+
+After Earth Engine setup, 163 regression tests passed in the full run. The Chroma persistence subprocess timed out in that run and passed in isolation. A separate CPU smoke test ran the existing YOLO checkpoint on three Al Ain tiles through the Monitoring Agent and LangGraph.
+
 | Phase | Deliverable | Acceptance criteria |
 | --- | --- | --- |
 | 1. Scientific RAG | Validated Arabic corpus ingestion, OpenAI embeddings, and ChromaDB retrieval | All 14 supplied records index once per corpus version and resolve to their source. Reingestion creates no duplicate IDs. An agreed Arabic question set covers in-scope queries, qualifiers, study caveats, and unsupported requests, with expected record IDs and explicit pass criteria. Bad source references fail validation. Empty or unsupported queries produce a structured evidence gap. Provider failures are testable with injected doubles. |
@@ -23,3 +27,4 @@ Phase 7 verification passed 131 offline tests, including HTTP flows for all four
 | 5. Collection and impact | Internal pickup workflow and deterministic scenario assessment | Missing actual pickup quantities or logistics yield a draft or data-gap response. Retry tests demonstrate idempotent writes. Impact tests cover known calculations with sourced inputs or clearly synthetic test fixtures, incompatible units, missing factors, and simulation labeling. No unsupported CO₂e or water savings are returned. |
 | 6. Palm monitoring | Imagery intake, observation contract, and gated YOLO integration | Verify dataset terms, imagery, annotations, duplicates, and fixed split membership before GPU training. Report precision, recall, mAP50, mAP50–95, and counting MAE for the experimental test split. Require geographically independent evaluation and owner-agreed thresholds before claiming geographic generalization. Test unusable imagery and confirm detections never overwrite farm records without review. |
 | 7. FastAPI and end-to-end testing | HTTP endpoints, dependency wiring, and documented local startup | Validate request and response contracts and error mappings. Pytest exercises Arabic recommendation, simulated farm lookup, pickup and impact outcomes, and monitoring success or explicit unavailability through HTTP using isolated stores and deterministic provider doubles. Document a separate live-provider smoke test and run it when credentials are available. Verify provenance, confidentiality of secrets, and predictable error responses. |
+| 8. Geospatial and satellite monitoring | WGS84 farm boundaries, Earth Engine Sentinel‑2 imagery and vegetation observations | Validate polygon topology and hectares, preserve the legacy farm simulation fields, and require a user boundary for satellite requests. Test NDVI math and provider failure handling through offline tests. Verify live retrieval separately after Earth Engine registration and authentication. Keep individual palm counting in the YOLO path. |

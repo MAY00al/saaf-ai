@@ -10,6 +10,8 @@ from saaf.agents.monitoring import MonitoringAgent
 from saaf.agents.recommendation import RecommendationResponse, build_agent
 from saaf.collection.repository import CollectionRepository
 from saaf.farms import FarmRepository
+from saaf.geospatial.repository import GeographyRepository
+from saaf.geospatial.service import GeoMonitoring
 from saaf.monitoring.inference import MonitoringSettings
 from saaf.providers import build_structured_chat, chat_config
 
@@ -41,8 +43,11 @@ class LiveImpactExplanation:
 
 
 class LocalMonitoring:
-    def __init__(self, farms: FarmRepository, output_dir: Path | None = None) -> None:
+    def __init__(
+        self, farms: FarmRepository, output_dir: Path | None = None, *, geospatial: GeoMonitoring | None = None,
+    ) -> None:
         self.farms = farms
+        self.geospatial = geospatial
         self.output_dir = output_dir
         self._lock = Lock()
 
@@ -51,7 +56,13 @@ class LocalMonitoring:
         settings = MonitoringSettings.from_environment()
         if self.output_dir is not None:
             settings = settings.model_copy(update={"output_dir": self.output_dir})
-        return MonitoringAgent(self.farms, settings)
+        return MonitoringAgent(self.farms, settings, geospatial=self.geospatial)
+
+    def inspect_geography(self, farm_id):
+        return self.agent.inspect_geography(farm_id)
+
+    def inspect_vegetation(self, farm_id, mode):
+        return self.agent.inspect_vegetation(farm_id, mode)
 
     def inspect_palms(self, farm_id, image, *, whole_farm=False):
         with self._lock:
@@ -64,9 +75,12 @@ class LocalMonitoring:
 
 def build_orchestrator(
     farms: FarmRepository, requests: CollectionRepository, *, image_output: Path | None = None,
+    geospatial: GeoMonitoring | None = None,
 ) -> tuple[Orchestrator, ImpactAgent]:
     impact = ImpactAgent(farms, requests, LiveImpactExplanation())
     return Orchestrator(
         LiveRecommendation(farms), collection=CollectionAgent(farms, requests),
-        impact=impact, monitoring=LocalMonitoring(farms, image_output),
+        impact=impact, monitoring=LocalMonitoring(
+            farms, image_output, geospatial=geospatial or GeoMonitoring(GeographyRepository(farms)),
+        ),
     ), impact

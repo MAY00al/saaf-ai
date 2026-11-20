@@ -10,6 +10,7 @@ from saaf.agents.impact import ImpactResult
 from saaf.agents.recommendation import RecommendationResponse
 from saaf.collection.models import CollectionResult, PickupDraft
 from saaf.monitoring.models import CountReview, MonitoringResult
+from saaf.geospatial.satellite import Mode
 
 Capability = Literal["recommendation", "collection", "monitoring", "impact"]
 Intent = Literal["recommendation", "collection", "monitoring", "impact", "clarification", "unsupported"]
@@ -71,6 +72,10 @@ class MonitoringPort(Protocol):
                       whole_farm: bool = False) -> MonitoringResult: ...
 
     def confirm_count(self, farm_id: str | None, review: CountReview | None) -> MonitoringResult: ...
+
+    def inspect_geography(self, farm_id: str | None) -> MonitoringResult: ...
+
+    def inspect_vegetation(self, farm_id: str | None, mode: Mode) -> MonitoringResult: ...
 
 
 class ImpactPort(Protocol):

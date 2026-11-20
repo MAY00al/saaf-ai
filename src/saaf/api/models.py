@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
@@ -105,3 +105,8 @@ class Health(BaseModel):
     status: str
     database: str | None = None
     vision_weights_configured: bool | None = None
+
+
+class AreaResult(BaseModel):
+    area_ha: float
+    area_method: Literal["WGS84_ellipsoidal"] = "WGS84_ellipsoidal"

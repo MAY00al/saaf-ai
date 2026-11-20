@@ -3,6 +3,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from saaf.farms.models import MAX_PALM_COUNT, RESIDUE_KG_PER_PALM_PER_YEAR
+from saaf.geospatial.service import VegetationResult
+from saaf.geospatial.repository import FarmGeography
 
 PalmCount = Annotated[int, Field(strict=True, ge=0, le=MAX_PALM_COUNT)]
 
@@ -48,6 +50,8 @@ class PalmObservation(BaseModel):
     estimated_annual_waste_kg: int
     waste_factor_kg_per_palm_per_year: Literal[35] = RESIDUE_KG_PER_PALM_PER_YEAR
     waste_factor_record_id: Literal["ctx-02"] = "ctx-02"
+    waste_factor_source_id: Literal["NASSER2016"] = "NASSER2016"
+    count_scope: Literal["image"] = "image"
     whole_farm_attested: bool
 
 
@@ -56,5 +60,7 @@ class MonitoringResult(BaseModel):
     answer_ar: str
     observation: PalmObservation | None = None
     pending_review: CountReview | None = None
+    vegetation: VegetationResult | None = None
+    geography: FarmGeography | None = None
     updated_farm_id: str | None = None
     error_code: Literal["missing_image", "invalid_image", "missing_model", "inference_failed", "stale_review"] | None = None

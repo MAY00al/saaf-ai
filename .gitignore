@@ -1,6 +1,11 @@
 .env
 .env.*
 !.env.example
+/.secrets/
+/.config/earthengine/
+/earthengine/credentials
+*service-account*.json
+application_default_credentials.json
 .venv/
 venv/
 __pycache__/

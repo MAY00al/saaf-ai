@@ -5,6 +5,9 @@ from uuid import uuid4
 
 from saaf.farms import FarmRepository
 from saaf.farms.models import RESIDUE_KG_PER_PALM_PER_YEAR
+from saaf.geospatial.repository import FarmMissing
+from saaf.geospatial.satellite import Mode, SatelliteQuery
+from saaf.geospatial.service import GeoMonitoring
 from saaf.monitoring.inference import (
     Detector, InvalidImage, ModelUnavailable, MonitoringSettings, YoloDetector, annotate_image, load_image,
 )
@@ -17,10 +20,46 @@ from .tools import get_farm_profile
 class MonitoringAgent:
     def __init__(
         self, farms: FarmRepository, settings: MonitoringSettings, detector: Detector | None = None,
+        *, geospatial: GeoMonitoring | None = None,
     ) -> None:
         self.farms = farms
         self.settings = settings
         self.detector = detector if detector is not None else YoloDetector(settings.weights)
+        self.geospatial = geospatial
+
+    def inspect_geography(self, farm_id: str | None) -> MonitoringResult:
+        if not farm_id:
+            return MonitoringResult(status="needs_input", answer_ar="أرسل معرّف المزرعة.")
+        if self.geospatial is None:
+            return MonitoringResult(status="unavailable", answer_ar="خدمة الحدود غير مهيّأة.")
+        try:
+            geography = self.geospatial.geography.get(farm_id)
+        except FarmMissing:
+            return MonitoringResult(status="needs_input", answer_ar="تعذّر العثور على المزرعة.")
+        if geography.registered_boundary is None:
+            return MonitoringResult(
+                status="needs_input", answer_ar="أضف حدوداً لحساب المساحة. الإحداثيات الحالية محاكاة.",
+                geography=geography,
+            )
+        return MonitoringResult(
+            status="ok", geography=geography,
+            answer_ar=f"المساحة المحسوبة من الحدود التي أدخلتها: {geography.registered_boundary.area_ha:.2f} هكتار. "
+                      "الحدود مدخلة من المستخدم ولم يتم التحقق منها ميدانياً.",
+        )
+
+    def inspect_vegetation(self, farm_id: str | None, mode: Mode = "ndvi") -> MonitoringResult:
+        if not farm_id:
+            return MonitoringResult(status="needs_input", answer_ar="أرسل معرّف المزرعة لتحليل الغطاء النباتي.")
+        if self.geospatial is None:
+            return MonitoringResult(status="unavailable", answer_ar="خدمة الأقمار الصناعية غير مهيّأة.")
+        result = self.geospatial.inspect(farm_id, mode, SatelliteQuery())
+        if result.status == "ok":
+            status = "ok"
+        elif result.status in {"boundary_required", "farm_not_found", "no_imagery"}:
+            status = "needs_input"
+        else:
+            status = "unavailable"
+        return MonitoringResult(status=status, answer_ar=result.answer_ar, vegetation=result)
 
     def inspect_palms(
         self, farm_id: str | None, image: Path | None, *, whole_farm: bool = False,

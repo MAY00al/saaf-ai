@@ -1,10 +1,12 @@
 """Deterministic Arabic and Saudi dialect routing for the supported domains."""
 
 import re
+from typing import Literal
 
 from saaf.agents.impact import is_environmental_query, requested_indicators
 from saaf.arabic import normalize
 from saaf.collection.commands import REQUEST_ID
+from saaf.geospatial.satellite import Mode
 from .contracts import Capability, Intent
 
 _PATTERNS: dict[Capability, re.Pattern[str]] = {
@@ -56,6 +58,21 @@ _COLLECTION_TOTAL = re.compile(
 )
 _SCIENTIFIC_REQUEST = re.compile(r"فحم|biochar|توصي|جرعه|ملوحه|قلويه|رطوبه|التبخر|دراس")
 _PICKUP_ACTION = re.compile(r"\b(?:استلم|اجمع|انقل|موعد|شاحنه|تشلون|ابغى|ابي|احجز|الغ|الغاء)\b")
+_GEOGRAPHY = re.compile(r"(?:حدود|مساحه|احداثيات) (?:ال)?مزرع\w*|farm (?:boundary|area|coordinates)")
+_VEGETATION = re.compile(r"\bndvi\b|sentinel[ -]?2|سنتينل|(?:صور|صوره) (?:ال)?اقمار صناعيه|الغطاء النباتي|satellite|vegetation")
+
+
+def geographic_request(query: str) -> Mode | Literal["geography", "satellite_count"] | None:
+    text = normalize(query)
+    if _VEGETATION.search(text):
+        if re.search(r"(?:عد|اعد|احسب|عدد|كم) (?:عدد )?(?:ال)?نخ(?:ل|يل|له)\b|palm count|count (?:individual )?palms", text):
+            return "satellite_count"
+        if re.search(r"تاريخ|تاريخي|سجل|مع الوقت|تغير|history|trend", text):
+            return "history"
+        if re.search(r"صور|imagery", text) and not re.search(r"ndvi|الغطاء النباتي|vegetation", text):
+            return "imagery"
+        return "ndvi"
+    return "geography" if _GEOGRAPHY.search(text) else None
 
 
 def classify(query: str, previous_intent: Capability | None = None) -> tuple[Intent, tuple[Capability, ...]]:
@@ -65,6 +82,8 @@ def classify(query: str, previous_intent: Capability | None = None) -> tuple[Int
     if _FOLLOWUP.fullmatch(text):
         return (previous_intent, (previous_intent,)) if previous_intent else ("clarification", ())
     candidates_found = {intent for intent, pattern in _PATTERNS.items() if pattern.search(text)}
+    if geographic_request(query):
+        candidates_found.add("monitoring")
     indicators = requested_indicators(text)
     if REQUEST_ID.search(query):
         candidates_found.add("collection")

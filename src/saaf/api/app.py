@@ -6,9 +6,10 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,10 @@ from saaf.agents.tools import FarmId
 from saaf.collection.models import CollectionRequest
 from saaf.collection.repository import CollectionRepository
 from saaf.farms import Farm, FarmAlreadyExists, FarmProfile, FarmRepository, FarmStatistics
+from saaf.geospatial.geometry import FarmBoundaryInput, GeoPolygon
+from saaf.geospatial.repository import FarmGeography, FarmMissing, GeographyRepository
+from saaf.geospatial.satellite import Mode, SatelliteProvider, SatelliteQuery
+from saaf.geospatial.service import FarmWasteEstimate, GeoMonitoring, VegetationResult
 from saaf.orchestration.contracts import ImpactPort, OrchestrationResponse
 from saaf.orchestration.graph import Orchestrator
 from saaf.orchestration.runtime import build_orchestrator
@@ -27,7 +32,7 @@ from saaf.providers import load_environment
 
 from .models import (
     ChatInput, ChatResponse, CollectionId, Confirmation, CountConfirmation, ErrorResponse,
-    FarmPatch, Health, ImpactInput, ObservationId, PickupConfirmation, PickupInput,
+    AreaResult, FarmPatch, Health, ImpactInput, ObservationId, PickupConfirmation, PickupInput,
     Region, SessionInfo,
 )
 from .sessions import Session, SessionCapacity, SessionMissing, Sessions
@@ -89,6 +94,7 @@ def _farm(request: Request, farm_id: str) -> FarmProfile:
 def create_app(
     services: Services | None = None, *, cors_origins: list[str] | None = None,
     session_ttl_seconds: int | None = None,
+    satellite_provider: SatelliteProvider | None = None,
 ) -> FastAPI:
     load_environment()
     origins = cors_origins if cors_origins is not None else [
@@ -109,10 +115,14 @@ def create_app(
         with TemporaryDirectory(prefix="api-", dir=root) as temp:
             application.state.files = Path(temp).resolve()
             application.state.sessions = Sessions(ttl)
+            farms = services.farms if services is not None else FarmRepository()
+            geography = GeoMonitoring(GeographyRepository(farms), satellite_provider)
+            application.state.geospatial = geography
             if services is None:
-                farms = FarmRepository()
                 collections = CollectionRepository(farms)
-                graph, impact = build_orchestrator(farms, collections, image_output=Path(temp) / "annotations")
+                graph, impact = build_orchestrator(
+                    farms, collections, image_output=Path(temp) / "annotations", geospatial=geography,
+                )
                 application.state.services = Services(farms, collections, impact, graph)
             else:
                 application.state.services = services
@@ -132,7 +142,7 @@ def create_app(
             return _error(500, "internal_error", "تعذّر إكمال الطلب.")
 
     app.add_middleware(
-        CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type"], allow_credentials=False,
     )
 
@@ -153,6 +163,10 @@ def create_app(
     @app.exception_handler(SessionCapacity)
     async def session_capacity(request, exc):
         return _error(503, "session_capacity", "تعذّر إنشاء جلسة إضافية الآن.")
+
+    @app.exception_handler(FarmMissing)
+    async def missing_geospatial_farm(request, exc):
+        return _error(404, "farm_not_found", "تعذّر العثور على المزرعة.")
 
     @app.get("/health/live", tags=["Health"], response_model=Health)
     def live():
@@ -229,6 +243,38 @@ def create_app(
         if not deleted:
             _fail(404, "farm_not_found", "تعذّر العثور على المزرعة.")
         return Response(status_code=204)
+
+    @router.post("/geography/area", response_model=AreaResult, tags=["Geography"])
+    def calculate_boundary_area(body: GeoPolygon):
+        return AreaResult(area_ha=body.area_ha())
+
+    @router.put("/farms/{farm_id}/boundary", response_model=FarmGeography, tags=["Geography"])
+    def register_boundary(request: Request, farm_id: FarmId, body: FarmBoundaryInput):
+        return request.app.state.geospatial.geography.register(farm_id, body)
+
+    @router.get("/farms/{farm_id}/boundary", response_model=FarmGeography, tags=["Geography"])
+    def get_boundary(request: Request, farm_id: FarmId):
+        return request.app.state.geospatial.geography.get(farm_id)
+
+    @router.get("/farms/{farm_id}/boundary/area", response_model=AreaResult, tags=["Geography"])
+    def registered_boundary_area(request: Request, farm_id: FarmId):
+        registered = request.app.state.geospatial.geography.get(farm_id).registered_boundary
+        if registered is None:
+            _fail(404, "boundary_required", "أضف حدود المزرعة أولاً.")
+        return AreaResult(area_ha=registered.area_ha)
+
+    @router.get("/farms/{farm_id}/waste-estimate", response_model=FarmWasteEstimate, tags=["Geography"])
+    def registered_waste_estimate(request: Request, farm_id: FarmId):
+        return request.app.state.geospatial.waste_estimate(farm_id)
+
+    @router.get("/farms/{farm_id}/satellite/{mode}", response_model=VegetationResult, tags=["Satellite"])
+    def satellite(request: Request, farm_id: FarmId, mode: Mode,
+                  options: Annotated[SatelliteQuery, Query()]):
+        """Return recent true-color imagery, NDVI with a map preview, or NDVI history."""
+        result = request.app.state.geospatial.inspect(farm_id, mode, options)
+        if result.status == "farm_not_found":
+            raise FarmMissing
+        return result
 
     @router.post("/sessions/{session_id}/collections/propose", response_model=ChatResponse, tags=["Collection"])
     def propose_collection(request: Request, session_id: UUID, body: PickupInput):

@@ -8,13 +8,14 @@ from pydantic import TypeAdapter
 from saaf.agents.recommendation import RecommendationResponse
 from saaf.agents.tools import FarmId
 from saaf.collection.commands import confirmation_action, has_quantity_input
+from saaf.monitoring.models import MonitoringResult
 from saaf.providers import RATE_LIMIT_AR, is_rate_limited
 
 from .contracts import (
     AgentState, CollectionPort, ConversationContext, ImpactPort, MonitoringPort,
     OrchestrationResponse, RecommendationPort,
 )
-from .routing import INLINE_FARM, classify, is_followup, mentions_other_farm, normalize
+from .routing import INLINE_FARM, classify, geographic_request, is_followup, mentions_other_farm, normalize
 
 _FARM_ID = TypeAdapter(FarmId)
 
@@ -158,8 +159,18 @@ class Orchestrator:
         context = state["context"]
         candidates = state["candidate_intents"]
         try:
+            geographic = geographic_request(state["agent_query"]) if state.get("image_path") is None else None
             if _confirm_count(state["query"]):
                 result = self.monitoring.confirm_count(context.farm_id, context.count_review)
+            elif geographic == "satellite_count":
+                result = MonitoringResult(
+                    status="needs_input",
+                    answer_ar="عدّ النخيل الفردي يحتاج صورة جوية عالية الدقة؛ صور Sentinel‑2 تُستخدم لرصد الغطاء النباتي.",
+                )
+            elif geographic == "geography":
+                result = self.monitoring.inspect_geography(context.farm_id)
+            elif geographic is not None:
+                result = self.monitoring.inspect_vegetation(context.farm_id, geographic)
             else:
                 result = self.monitoring.inspect_palms(
                     context.farm_id, state.get("image_path"), whole_farm=state.get("whole_farm", False),
@@ -173,7 +184,8 @@ class Orchestrator:
                 intent="monitoring", status="unavailable", context=context, candidate_intents=candidates,
                 answer_ar="تعذّر تشغيل الرصد المحلي حالياً. تحقق من إعدادات الصورة والأوزان.",
             )}
-        context = context.model_copy(update={"count_review": result.pending_review})
+        if geographic is None:
+            context = context.model_copy(update={"count_review": result.pending_review})
         return {"response": OrchestrationResponse(
             intent="monitoring", status=result.status, context=context, answer_ar=result.answer_ar,
             candidate_intents=candidates, monitoring=result,

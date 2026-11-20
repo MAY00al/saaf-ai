@@ -141,3 +141,27 @@ python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Open [Swagger UI](http://127.0.0.1:8000/docs) or download the [OpenAPI schema](http://127.0.0.1:8000/openapi.json). The [frontend integration guide](docs/API_INTEGRATION.md) covers sessions, routes, JSON examples, image uploads, CORS, health checks, and the opt-in live test. Use one Uvicorn worker for the MVP's in-memory sessions. Farm and collection records persist in SQLite.
+
+## Frontend Developer Quick Start
+
+1. Follow the [Frontend Developer Guide](docs/FRONTEND_GUIDE.md) to configure the backend and seed the 20 simulated farms.
+2. Start the server from the repository root using the command above. Check [readiness](http://127.0.0.1:8000/health/ready), then explore the contracts in [Swagger UI](http://127.0.0.1:8000/docs) and the [API integration reference](docs/API_INTEGRATION.md).
+3. Create a `feat/frontend` branch and scaffold your preferred framework in `frontend/`. Set the browser's API base URL to `http://127.0.0.1:8000` and add your dev-server origin to the backend's `SAAF_CORS_ORIGINS` if needed.
+
+Starting prompt for an AI coding tool:
+
+> Read the frontend guide, API integration reference, and running OpenAPI schema. Build a responsive Arabic RTL dashboard and farm selector in `frontend/` using the seeded backend. Preserve active-farm and session context, show simulation labels and Arabic error states, and keep backend contracts and credentials private. Treat live Earth Engine imagery as pending verification.
+
+## Farm boundaries and satellite monitoring
+
+Register a WGS84 GeoJSON Polygon on a farm using the boundary endpoint. SAAF calculates its geodesic area in hectares and labels it as user-provided and unverified. Existing farm points and areas retain their simulation provenance. The API uses the registered polygon for satellite queries.
+
+To enable Google Earth Engine:
+
+1. Create or select a Google Cloud project, enable the Earth Engine API, and register the project for the intended commercial or noncommercial use. Complete Google's noncommercial verification if applicable. Ask the project administrator for Earth Engine access and Service Usage Consumer permission if needed. [Earth Engine access](https://developers.google.com/earth-engine/guides/access) · [Project roles](https://developers.google.com/earth-engine/guides/access_control)
+2. Install the optional client with `python -m pip install -e ".[satellite]"`. For local login, run `earthengine authenticate` as the account that runs the API. Earth Engine also accepts Application Default Credentials. For a service account JSON file, set `SAAF_EE_SERVICE_ACCOUNT_FILE` to its local path and keep the file outside Git. [Authentication](https://developers.google.com/earth-engine/guides/auth) · [Service accounts](https://developers.google.com/earth-engine/guides/service_account)
+3. Set `SAAF_EE_PROJECT` in `.env` to the registered project ID and restart the API. The local configured project is `saaf-ai`. To verify live access through the HTTP endpoints using the public Broadbalk demonstration polygon, run `python -m pytest -q -s tests/live_earth_engine.py`. The API guide provides the same requests for Swagger.
+
+The Earth Engine CLI sign-in and a live initialization probe succeeded for `saaf-ai`. The separate Broadbalk endpoint smoke test is still pending.
+
+Earth Engine receives the user-provided polygon and date range when a satellite query runs. It returns Sentinel‑2 imagery and vegetation observations. NDVI is a vegetation indicator. Individual palm counts still require high-resolution aerial images and YOLO. See the [API guide](docs/API_INTEGRATION.md) for query options, visualization data, and response statuses.

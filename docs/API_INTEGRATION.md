@@ -31,6 +31,10 @@ This is a single-worker, loopback MVP with a shared simulated registry. Sessions
 | `POST /sessions/{session_id}/monitoring/detect` | Upload one JPEG or PNG as the raw body. Query parameters are `farm_id` and optional `whole_farm=true`. |
 | `GET /sessions/{session_id}/images/{observation_id}` | Fetch the annotated PNG from the originating session. |
 | `POST /sessions/{session_id}/monitoring/confirm` | Confirm the pending observation and update the simulated farm count. |
+| `PUT /farms/{farm_id}/boundary`, `GET /farms/{farm_id}/boundary` | Register or read a user-provided polygon and optional point. The response includes the separate simulated registry location. |
+| `POST /geography/area`, `GET /farms/{farm_id}/boundary/area` | Calculate WGS84 geodesic area in hectares from a supplied or registered polygon. |
+| `GET /farms/{farm_id}/satellite/imagery`, `/satellite/ndvi`, `/satellite/history` | Get the latest suitable true-color image, NDVI statistics and preview, or historical NDVI observations. |
+| `GET /farms/{farm_id}/waste-estimate` | Get the whole-farm estimate based on the stored simulated or reviewed model count. It includes the source and scope. |
 
 Except health and documentation routes, prefix each path above with `/api/v1`.
 
@@ -99,3 +103,56 @@ Domain outcomes such as `needs_input`, `awaiting_confirmation`, `insufficient_ev
 ```
 
 Create a fresh session after expiration and repeat the proposal rather than replaying a prior confirmation. Use `python -m pytest -q` for the offline suite and `python -m pytest -q tests/live_api.py` for an opt-in provider smoke test.
+
+## Farm boundaries and vegetation
+
+Upload a GeoJSON Polygon in longitude, latitude order. Rings must be closed. Holes are supported. Multipolygons and antimeridian crossings require preprocessing. Optional named coordinates must both be present and inside or on the polygon. When omitted, the API reports an interior point derived from the user boundary. The example below is illustrative.
+
+```json
+{
+  "boundary":{"type":"Polygon","coordinates":[[[49.52,25.40],[49.521,25.40],[49.521,25.401],[49.52,25.401],[49.52,25.40]]]},
+  "latitude":25.4005,
+  "longitude":49.5205
+}
+```
+
+Send the wrapper to `PUT /api/v1/farms/SIM-001/boundary`, or send the bare GeoJSON Polygon to `POST /api/v1/geography/area` for a calculation without saving. Read `registered_boundary.area_ha` for the calculated area. `stored_location` and `stored_area_ha` retain their original simulation meaning.
+
+Satellite endpoints accept optional `start_date` and `end_date` as inclusive ISO calendar dates, `max_scene_cloud_pct` (default 80), `min_clear_fraction` (default 0.5), and a history `limit` from 1 to 12. The default window covers the last 90 days. Maximum window length is 366 days. Requests consider up to 60 recent candidate scenes. A scene cloud percentage describes the full Sentinel‑2 tile. Farm valid fraction describes usable pixels inside the supplied boundary after masking. `vegetation_fraction_of_valid` is the fraction of those pixels that Sentinel‑2 classifies as vegetation using SCL class 4 at 20 m native resolution. Each qualifying NDVI scene includes mean, minimum, and maximum at 10 m reflectance resolution. History is oldest first and contains observations for suitable scenes rather than interpolated dates.
+
+For a recent image or NDVI preview, render `preview.data` as a base64 PNG overlay with `preview.bounds` in `[west,south,east,north]` and CRS EPSG:4326. The NDVI scale spans −1 to +1, from blue through pale yellow to green. Use `scenes` for a time-series chart. Use the boundary geometry for the outline.
+
+Satellite responses can return `boundary_required`, `not_configured`, `authentication_failed`, `provider_unavailable`, or `no_imagery` with no observations. NDVI does not establish palm counts or measured irrigation savings. Waste is estimated from the stored whole-farm count using `ctx-02`; the YOLO response retains its image count scope. See the [Earth Engine setup in README](../README.md#farm-boundaries-and-satellite-monitoring) for account and permission requirements.
+
+### Swagger walkthrough using public agricultural coordinates
+
+This demonstration uses a small sampling rectangle around the point published for the Broadbalk long-term wheat experiment in Harpenden, UK. The rectangle is an analytical test boundary. The published point comes from [Rothamsted Research](https://www.era.rothamsted.ac.uk/experiment/rbk1).
+
+1. Run these commands in PowerShell from the repository root after installing the satellite extra and authenticating. They isolate the demo from existing farm boundaries.
+
+   ```powershell
+   $env:SAAF_SQLITE_PATH = "var/broadbalk-demo.sqlite3"
+   python -m saaf.farms seed --db var/broadbalk-demo.sqlite3
+   python -m uvicorn saaf.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
+   ```
+
+2. Open [Swagger UI](http://127.0.0.1:8000/docs). Select **PUT /api/v1/farms/{farm_id}/boundary**, click **Try it out**, and enter `SIM-001`.
+3. Paste the JSON below and click **Execute**. Check for `registered_boundary.origin: "user_provided"` and an area in hectares.
+
+```json
+{
+  "boundary": {
+    "type": "Polygon",
+    "coordinates": [[[-0.3736,51.8091],[-0.3724,51.8091],[-0.3724,51.8098],[-0.3736,51.8098],[-0.3736,51.8091]]]
+  },
+  "longitude": -0.37301,
+  "latitude": 51.80946
+}
+```
+
+4. Select **GET /api/v1/farms/{farm_id}/satellite/{mode}**. Use `SIM-001`, `start_date=2026-05-01`, `end_date=2026-07-31`, `max_scene_cloud_pct=80`, `min_clear_fraction=0.5`, and `limit=3`. Execute once for each mode:
+   - `imagery` returns Sentinel‑2 scene metadata and a true-color base64 PNG.
+   - `ndvi` returns mean, minimum, and maximum NDVI and a colorized base64 PNG.
+   - `history` returns up to three observations in chronological order.
+
+For a terminal equivalent, request `GET /api/v1/farms/SIM-001/satellite/ndvi?start_date=2026-05-01&end_date=2026-07-31&max_scene_cloud_pct=80&min_clear_fraction=0.5&limit=3`. Check the JSON `status` before rendering. Run the three modes once for a smoke test. The UI should avoid automatically polling Earth Engine.
