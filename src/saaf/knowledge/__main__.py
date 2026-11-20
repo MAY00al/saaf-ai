@@ -3,20 +3,22 @@
 import argparse
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from langchain_openai import OpenAIEmbeddings
+from saaf.providers import build_embeddings, embedding_config, load_environment
 
 from .evaluation import evaluate
-from .retrieval import DEFAULT_MIN_SCORE, DEFAULT_MODEL, DEFAULT_TOP_K, KnowledgeIndex
+from .retrieval import DEFAULT_MIN_SCORE, DEFAULT_TOP_K, KnowledgeIndex
 
 
 def main() -> None:
+    load_environment()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, default=Path("data/saaf_knowledge_base.json"))
     parser.add_argument("--index-dir", type=Path, default=os.getenv("SAAF_CHROMA_DIR") or "var/chroma")
-    parser.add_argument("--model", default=os.getenv("SAAF_EMBEDDING_MODEL") or DEFAULT_MODEL)
+    parser.add_argument("--model", help="Override the configured embedding model")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("ingest")
     search = commands.add_parser("search")
@@ -31,12 +33,20 @@ def main() -> None:
     if args.command != "ingest":
         if args.top_k < 1 or not -1 <= args.min_score <= 1:
             parser.error("top-k must be positive and min-score must be between -1 and 1")
-    if not os.getenv("OPENAI_API_KEY", "").strip():
-        parser.error("set OPENAI_API_KEY in the environment for live embeddings")
-    embeddings = OpenAIEmbeddings(model=args.model, check_embedding_ctx_length=False)
-    index = KnowledgeIndex(args.corpus, args.index_dir, embeddings, model=args.model)
+    try:
+        config = embedding_config()
+        if args.model:
+            config = replace(config, model=args.model)
+        embeddings = build_embeddings(config)
+    except ValueError as exc:
+        parser.error(str(exc))
+    index = KnowledgeIndex(
+        args.corpus, args.index_dir, embeddings, model=config.model, provider=config.provider,
+    )
     added = index.ingest()
-    output: dict[str, Any] = {"model": args.model, "collection": index.name}
+    output: dict[str, Any] = {
+        "provider": config.provider, "model": config.model, "collection": index.name,
+    }
     if args.command == "ingest":
         output.update(added=added, total=len(index.records))
     elif args.command == "evaluate":

@@ -40,18 +40,20 @@ class SearchResult:
 class KnowledgeIndex:
     def __init__(
         self, corpus_path: Path, index_path: Path, embeddings: Embeddings,
-        *, model: str = DEFAULT_MODEL,
+        *, model: str = DEFAULT_MODEL, provider: str = "openai",
     ) -> None:
         self.corpus, digest = load_corpus(corpus_path)
         self.records = {record.id: record for record in self.corpus.records}
         self.embeddings = embeddings
-        fingerprint = sha256(f"v1\n{model}\n{digest}".encode()).hexdigest()
+        # Preserve the existing OpenAI collection identity across the upgrade.
+        namespace = "v1" if provider == "openai" else f"v2:{provider}"
+        fingerprint = sha256(f"{namespace}\n{model}\n{digest}".encode()).hexdigest()
         self.name = f"saaf-{fingerprint[:40]}"
         client = chromadb.PersistentClient(path=str(index_path))
         self.collection = client.get_or_create_collection(
             self.name,
             configuration={"hnsw": {"space": "cosine"}},
-            metadata={"corpus_sha256": digest, "embedding_model": model},
+            metadata={"corpus_sha256": digest, "embedding_model": model, "embedding_provider": provider},
             embedding_function=None,
         )
 

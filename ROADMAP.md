@@ -1,6 +1,8 @@
 # Implementation roadmap
 
-Phase 0 delivered the dataset audit, architecture, contracts, repository scaffold, and configuration template. Phase 1 is implemented, with offline verification and a separate live benchmark command in [README.md](README.md). Live OpenAI retrieval accuracy and cutoff calibration are pending credentials. Phase 2 implements the simulated farm repository, transactional seeding, typed profiles, and regional aggregates. Phase 3 requires owner approval.
+Phase 0 delivered the architecture and repository scaffold. Phase 1 implements scientific retrieval. Phase 2 implements the simulated farm repository. Phase 3 implements the Arabic recommendation agent with offline scenario coverage and configurable OpenAI or Gemini chat and embeddings. See [README.md](README.md) for the live retrieval benchmark and the opt-in Gemini integration test. Phase 4 requires owner approval.
+
+Phase 3 verification passed 61 offline tests and one live Gemini integration test covering a cited Saudi dialect query and an unsupported irrigation-savings request. Corpus-wide live retrieval calibration remains open.
 
 | Phase | Deliverable | Acceptance criteria |
 | --- | --- | --- |

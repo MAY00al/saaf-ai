@@ -2,7 +2,7 @@
 
 SAAF is an Arabic-first AI platform for date palm residue management, evidence-grounded biochar recommendations, collection planning, environmental impact assessment, and palm monitoring.
 
-Phase 1 provides scientific evidence ingestion, Arabic semantic search, and a retrieval benchmark. Phase 2 adds a SQLite repository for simulated farm profiles. Phase 3 requires owner approval.
+Phase 1 provides Arabic scientific retrieval. Phase 2 adds a SQLite repository for simulated farm profiles. Phase 3 adds the Arabic recommendation agent. Phase 4 requires owner approval.
 
 | Input | Intended use |
 | --- | --- |
@@ -45,7 +45,7 @@ Use `create_farm(Farm(...))`, `get_farm(farm_id)`, `update_farm(farm_id, **chang
 
 ## Live retrieval
 
-Set `OPENAI_API_KEY` in the shell environment before running these commands. The CLI reads environment variables directly. [.env.example](.env.example) lists the settings. Use `SAAF_EMBEDDING_MODEL` to override `text-embedding-3-small`, or `SAAF_CHROMA_DIR` to override `var/chroma`.
+Configure the embedding provider and credentials as described below. Use `SAAF_CHROMA_DIR` to override `var/chroma`.
 
 ```sh
 python -m saaf.knowledge ingest
@@ -53,6 +53,30 @@ python -m saaf.knowledge search "ما أثر الفحم الحيوي على تب
 python -m saaf.knowledge evaluate --top-k 3 --min-score 0.35
 ```
 
-One vector represents each complete Arabic record. The corpus digest, embedding model, and index format version identify a collection. Repeated ingestion skips existing IDs. A source or model change selects a new collection and rebuilds on the next invocation. Older collections occupy local disk until explicitly removed. Results include cosine similarity, the original record with its scientific metadata, and the resolved source. An optional `--topic` filters by the exact Arabic topic. Blank queries or queries with no hit above the cutoff return `insufficient_evidence`.
+One vector represents each complete Arabic record. The corpus digest, embedding provider, embedding model, and index format identify a collection. A change selects a separate collection and rebuilds it on first use. Switching back reuses the earlier matching collection. Chat model changes use the existing vector index. Older collections occupy local disk until explicitly removed. Results include cosine similarity, the original record with its scientific metadata, and the resolved source. An optional `--topic` filters by the exact Arabic topic. Blank queries or queries with no hit above the cutoff return `insufficient_evidence`.
 
 The benchmark covers 10 evidence-seeking questions and three negatives, including a topically similar question about measured farm irrigation savings. It reports case accuracy, positive hit rate and mean reciprocal rank at k, negative rejection rate, and per-query IDs and scores. A positive passes when its expected record is returned. A negative passes when no hits survive. Fixture embeddings deliberately encode the expected labels to verify benchmark and retrieval mechanics. Live evaluation requires credentials. The default cosine cutoff of 0.35 is provisional. Semantically related records can score highly even when they cannot answer a question.
+
+## Arabic recommendation agent
+
+Copy [.env.example](.env.example) to `.env` in the repository root and supply the selected provider's key. Both AI CLIs load that file, and exported environment variables take precedence. Set `SAAF_CHAT_PROVIDER` and `SAAF_EMBEDDING_PROVIDER` independently to `openai` or `gemini`. Set `SAAF_CHAT_MODEL` and `SAAF_EMBEDDING_MODEL` to override the selected defaults. Chat model overrides must support structured output.
+
+| Provider | Credential | Default chat | Default embeddings |
+| --- | --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4.1-mini` | `text-embedding-3-small` |
+| Gemini Developer API | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `gemini-3.1-flash-lite` | `gemini-embedding-001` |
+
+For Gemini, set both provider fields to `gemini` and leave both model fields blank to use the defaults. The opt-in live test always uses the listed Gemini models, which Google offers on its free tier, subject to project quota. [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing)
+
+Seed the farm database before using a farm ID in the CLI.
+
+```sh
+python -m saaf.farms seed
+python -m saaf.agents "وش أراعي قبل أحط فحم حيوي في تربتي؟" --farm-id SIM-002
+python -m saaf.agents "ما الجرعة المرجعية للتربة الرملية؟"
+python -m pytest -q tests/live_recommendation.py
+```
+
+The agent runs a bounded sequence of typed, read-only farm lookup, soil assessment, and scientific search. LangChain passes the question, relevant farm attributes, retrieved records, and corpus rules to the configured chat provider. The model classifies the question and selects record IDs. The agent validates those IDs and renders Arabic evidence and recommendations using the original record text, citations, caveats, and fixed guidance. Output statuses are `ok`, `needs_input`, `insufficient_evidence`, and `unavailable`. `simulated_data` is true when a simulated profile was used and null when no profile was used.
+
+The offline suite runs Arabic and Saudi dialect scenarios with controlled model decisions. Live model interpretation and retrieval relevance still depend on the configured models and corpus coverage. The agent uses soil sand percentage as context and does not infer a complete texture class from it. It applies pH and salinity cautions and gives no field prescription or numerical irrigation savings forecast.
