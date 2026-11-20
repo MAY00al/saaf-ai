@@ -22,17 +22,19 @@
 
 ## Application design
 
-Use a single Python application with FastAPI as the HTTP boundary in Phase 7. LangGraph routes typed requests and manages per-request state. LangChain integrates OpenAI chat and embeddings and exposes narrowly scoped typed tools. Agents receive use-case inputs and call injected services. They have no direct SQLite, ChromaDB, or HTTP access. SQLite is the authoritative store for mutable farm and workflow records. ChromaDB serves a rebuildable scientific search index. The original JSON inputs remain the source artifacts.
+Use a single Python application with FastAPI as the HTTP boundary in Phase 7. LangGraph routes typed requests and manages per-request state. LangChain integrates configurable OpenAI or Gemini chat and embeddings. Agents receive use-case inputs and call injected services. They have no direct SQLite, ChromaDB, or HTTP access. SQLite is the authoritative store for mutable farm and workflow records. ChromaDB serves a rebuildable scientific search index. The original JSON inputs remain the source artifacts.
 
 **Knowledge flow.** Validate IDs and cross-references, then embed one `text_ar` per record. Store scalar metadata for filtering and hydrate full conditions, caveats, and source details by record ID from the validated corpus. Track corpus and embedding configuration so index rebuilds are repeatable. Evaluate Arabic retrieval on an annotated question set, including hard negatives. Return insufficient evidence if retrieved material cannot support the claim.
 
 **Farm flow.** Validate and transactionally import fixtures keyed by farm ID. Keep simulation origin explicit and distinguish measured, estimated, and unknown fields. Farm lookups supply typed context. Query results from a simulated profile keep that label through routing, calculation, and HTTP serialization.
 
-**Control flow.** The API validates input and passes it to the graph. The router selects an allowed use case or asks for missing inputs. Graph state carries Arabic request text, intent, validated inputs, result, warnings, evidence references, and provenance. Limit tool execution and retries. Use stable operation IDs and transactional writes for retryable mutations. Keep dispatch outside the MVP. Log operation IDs, outcomes, and timings with sensitive fields excluded.
+**Control flow.** The Phase 4 CLI invokes an acyclic LangGraph with a typed `AgentState`. A normalized Arabic rule-based router selects one capability or requests clarification. A turn runs at most one agent. The Recommendation Agent calls typed read-only farm and evidence tools that validate arguments, farm identity, and evidence membership. The graph preserves its structured output, including citations and simulation provenance, and maps failures to Arabic messages without exposing provider exception details. Future collection, monitoring, and impact ports have explicit contracts and currently return `not_implemented`.
+
+Conversation context is supplied by the caller and returned with each result. It holds an active farm ID and the last supported question and intent. A recognized follow-up can reuse the previous question for the same farm. Switching farms discards that question. Conflicting IDs stop dispatch. The interactive CLI keeps context in memory for its session.
 
 ## Proposed contracts
 
-All agent results carry a status (`ok`, `needs_input`, `insufficient_evidence`, or `unavailable`), Arabic text, typed output, warnings, and provenance. Citations resolve to record ID, source ID, title, URL, evidence type, and available conditions and caveats. Quantities carry a unit and an origin or calculation method. User errors and provider failures have stable machine-readable codes.
+Agent results carry a status (`ok`, `needs_input`, `insufficient_evidence`, or `unavailable`), Arabic text, typed output, warnings, and provenance as applicable. The orchestrator also returns `unsupported` and `not_implemented`. Citations resolve to record ID, source ID, title, URL, evidence type, and available conditions and caveats. Quantities carry a unit and an origin or calculation method.
 
 | Component | Inputs | Output and responsibility |
 | --- | --- | --- |

@@ -10,7 +10,10 @@ from pydantic import BaseModel, ConfigDict, JsonValue
 
 from saaf.farms import FarmRepository
 from saaf.knowledge.retrieval import DEFAULT_TOP_K, KnowledgeIndex
-from saaf.providers import build_embeddings, build_structured_chat, chat_config, embedding_config, load_environment
+from saaf.providers import (
+    RATE_LIMIT_AR, build_embeddings, build_structured_chat, chat_config, embedding_config,
+    is_rate_limited, load_environment,
+)
 
 from .tools import SoilAssessment, assess_soil_suitability, get_farm_profile, search_scientific_evidence
 
@@ -103,6 +106,9 @@ class RecommendationAgent:
             profile = get_farm_profile(self.farms, farm_id)
         except sqlite3.Error:
             return response("unavailable", "تعذّر الوصول إلى بيانات المزرعة.")
+        except ValueError:
+            return response("needs_input", "تعذّر التحقق من معرّف المزرعة. أرسل معرّفاً صالحاً.",
+                            missing=("معرّف مزرعة صالح",))
         if profile is not None:
             simulated_data = profile.simulated
             assessment = assess_soil_suitability(profile)
@@ -128,14 +134,16 @@ class RecommendationAgent:
                 "records": [hit.record.model_dump(exclude_unset=True) for hit in hits.values()],
             }
             rules = "\n".join(self.knowledge.corpus.agent_rules_ar)
-        except (RuntimeError, ValueError, sqlite3.Error):
-            return response("unavailable", "تعذّر تقييم الأدلة حالياً. حاول مرة أخرى.")
+        except (RuntimeError, ValueError, sqlite3.Error) as exc:
+            return response("unavailable", RATE_LIMIT_AR if is_rate_limited(exc)
+                            else "تعذّر تقييم الأدلة حالياً. حاول مرة أخرى.")
         messages = [("system", _SYSTEM_PROMPT + rules), ("human", json.dumps(payload, ensure_ascii=False))]
         try:
             decision = EvidenceDecision.model_validate(self.model.invoke(messages))
-        except Exception:
+        except Exception as exc:
             # Model adapters can raise different transport, safety, or parse errors.
-            return response("unavailable", "تعذّر تقييم الأدلة حالياً. حاول مرة أخرى.")
+            return response("unavailable", RATE_LIMIT_AR if is_rate_limited(exc)
+                            else "تعذّر تقييم الأدلة حالياً. حاول مرة أخرى.")
 
         if any(record_id not in hits for record_id in decision.record_ids):
             return response("insufficient_evidence", "لم أجد إحالات موثقة لهذا السؤال في السجلات المسترجعة.")

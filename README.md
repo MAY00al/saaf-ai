@@ -2,7 +2,7 @@
 
 SAAF is an Arabic-first AI platform for date palm residue management, evidence-grounded biochar recommendations, collection planning, environmental impact assessment, and palm monitoring.
 
-Phase 1 provides Arabic scientific retrieval. Phase 2 adds a SQLite repository for simulated farm profiles. Phase 3 adds the Arabic recommendation agent. Phase 4 requires owner approval.
+Phase 1 provides Arabic scientific retrieval. Phase 2 adds a SQLite repository for simulated farm profiles. Phase 3 adds the Arabic recommendation agent. Phase 4 adds LangGraph orchestration. Phase 5 requires owner approval.
 
 | Input | Intended use |
 | --- | --- |
@@ -59,7 +59,7 @@ The benchmark covers 10 evidence-seeking questions and three negatives, includin
 
 ## Arabic recommendation agent
 
-Copy [.env.example](.env.example) to `.env` in the repository root and supply the selected provider's key. Both AI CLIs load that file, and exported environment variables take precedence. Set `SAAF_CHAT_PROVIDER` and `SAAF_EMBEDDING_PROVIDER` independently to `openai` or `gemini`. Set `SAAF_CHAT_MODEL` and `SAAF_EMBEDDING_MODEL` to override the selected defaults. Chat model overrides must support structured output.
+Copy [.env.example](.env.example) to `.env` in the repository root and supply the selected provider's key. The AI CLIs load that file, and exported environment variables take precedence. Set `SAAF_CHAT_PROVIDER` and `SAAF_EMBEDDING_PROVIDER` independently to `openai` or `gemini`. Set `SAAF_CHAT_MODEL` and `SAAF_EMBEDDING_MODEL` to override the selected defaults. Chat model overrides must support structured output.
 
 | Provider | Credential | Default chat | Default embeddings |
 | --- | --- | --- | --- |
@@ -80,3 +80,16 @@ python -m pytest -q tests/live_recommendation.py
 The agent runs a bounded sequence of typed, read-only farm lookup, soil assessment, and scientific search. LangChain passes the question, relevant farm attributes, retrieved records, and corpus rules to the configured chat provider. The model classifies the question and selects record IDs. The agent validates those IDs and renders Arabic evidence and recommendations using the original record text, citations, caveats, and fixed guidance. Output statuses are `ok`, `needs_input`, `insufficient_evidence`, and `unavailable`. `simulated_data` is true when a simulated profile was used and null when no profile was used.
 
 The offline suite runs Arabic and Saudi dialect scenarios with controlled model decisions. Live model interpretation and retrieval relevance still depend on the configured models and corpus coverage. The agent uses soil sand percentage as context and does not infer a complete texture class from it. It applies pH and salinity cautions and gives no field prescription or numerical irrigation savings forecast.
+
+## Orchestration
+
+```sh
+python -m saaf.orchestration "وش أراعي قبل أحط فحم حيوي؟" --farm-id SIM-002
+python -m saaf.orchestration
+python -m saaf.orchestration --evaluate-routing
+python -m pytest -q tests/live_orchestration.py
+```
+
+The interactive CLI keeps the active farm and last supported request in memory. Use `/farm ID` to select a farm for the next turn, `/reset` to clear context, and `/exit` to quit. An inline `SIM-NNN` also supplies the farm ID. A switch to another farm clears the previous question. Conflicting IDs and multi-intent requests ask for clarification.
+
+Routing uses normalized Arabic phrases and selected Saudi expressions. Only the recommendation route initializes an AI provider. Collection, monitoring, and environmental impact return `not_implemented`. The routing benchmark measures exact intent and candidate matching on the included labeled examples. It makes no API calls and does not measure answer quality. The explicit live test uses the configured providers and is excluded from the default suite.

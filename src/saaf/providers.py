@@ -12,6 +12,21 @@ from saaf.knowledge.retrieval import DEFAULT_MODEL, Embeddings
 OPENAI_CHAT_MODEL = "gpt-4.1-mini"
 GEMINI_CHAT_MODEL = "gemini-3.1-flash-lite"
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
+RATE_LIMIT_AR = "بلغت خدمة الذكاء الاصطناعي حد الاستخدام مؤقتاً. حاول مرة أخرى لاحقاً."
+
+
+def is_rate_limited(error: BaseException) -> bool:
+    """Recognize quota errors including failures wrapped by retrieval."""
+    seen = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if (getattr(current, "status_code", None) == 429
+                or getattr(current, "code", None) == 429
+                or getattr(current, "status", None) == "RESOURCE_EXHAUSTED"):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 @dataclass(frozen=True)

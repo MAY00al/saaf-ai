@@ -10,8 +10,10 @@ dependencies = [
     "chromadb>=1.0,<2",
     "langchain-openai>=1,<2",
     "langchain-google-genai>=4,<5",
+    "langgraph>=1,<2",
     "pydantic>=2,<3",
     "python-dotenv>=1,<2",
+    "typing-extensions>=4.10,<5",
 ]
 
 [project.optional-dependencies]
