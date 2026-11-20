@@ -1,0 +1,236 @@
+{
+  "about": {
+    "name": "قاعدة معرفة وكيل التوصيات – مشروع سَعَف",
+    "purpose": "مصدر الإجابات لوكيل التوصيات (RAG). الوكيل يجيب من هذه السجلات فقط ويذكر مصدر كل معلومة.",
+    "verified_on": "2026-11-18",
+    "credibility": "كل سجل منقول من مصدر فُتح وتمت قراءته: إحصاءات رسمية سعودية وأبحاث محكّمة منشورة برخصة مفتوحة (CC BY). لا توجد أرقام مقدّرة من الفريق في هذا الملف.",
+    "how_to_use": "حوّل حقل text_ar لكل سجل إلى embedding، واحفظ source_id وevidence_level وcaveat_ar كبيانات وصفية تُعرض مع الإجابة. أضف agent_rules إلى تعليمات النظام (system prompt).",
+    "license_note": "الأبحاث منشورة برخصة CC BY: يجوز استخدام نتائجها مع ذكر المصدر."
+  },
+  "sources": {
+    "GASTAT2023": {
+      "title": "الهيئة العامة للإحصاء – إحصاءات الزراعة 2023",
+      "url": "https://stats.gov.sa/sites/default/files/Agriculture%20Statistics%202023AR.pdf",
+      "type": "إحصاء رسمي"
+    },
+    "MEWA_WATER": {
+      "title": "وزارة البيئة والمياه والزراعة – وثيقة قطاع المياه",
+      "url": "https://www.mewa.gov.sa/ar/Ministry/Agencies/AgencyForInnovation/Topics/LegislativeExperimentalEnvProgram/Documents/MEWA-Water-AR_changes_05.16.pdf",
+      "type": "وثيقة رسمية"
+    },
+    "NASSER2016": {
+      "title": "Nasser, R.A. et al. (2016). Chemical Analysis of Different Parts of Date Palm (Phoenix dactylifera L.) Using Ultimate, Proximate and Thermo-Gravimetric Techniques for Energy Production. Energies 9, 374.",
+      "url": "https://core.ac.uk/download/227082056.pdf",
+      "type": "بحث محكّم",
+      "institution": "جامعة الملك سعود"
+    },
+    "FAIAD2022": {
+      "title": "Faiad, A. et al. (2022). Date Palm Tree Waste Recycling: Treatment and Processing for Potential Engineering Applications. Sustainability 14(3), 1134.",
+      "url": "https://www.mdpi.com/2071-1050/14/3/1134",
+      "type": "بحث محكّم",
+      "institution": "جامعة الأمير سطام بن عبدالعزيز"
+    },
+    "ALKHASHA2018": {
+      "title": "Alkhasha, A., Al-Omran, A., Aly, A. (2018). Effects of Biochar and Synthetic Polymer on the Hydro-Physical Properties of Sandy Soils. Sustainability 10(12), 4642.",
+      "url": "https://www.mdpi.com/2071-1050/10/12/4642",
+      "type": "بحث محكّم",
+      "institution": "جامعة الملك سعود"
+    },
+    "ALGHAMDI2022": {
+      "title": "Alghamdi, A.G., Al-Omran, A., Alkhasha, A., Alharbi, A.R. (2022). Impacts of Biochar on Hydro-Physical Properties of Sandy Soil under Different Irrigation Regimes for Enhanced Tomato Growth. Agronomy 12, 1762.",
+      "url": "https://fac.ksu.edu.sa/sites/default/files/agronomy-12-01762-v3.pdf",
+      "type": "بحث محكّم",
+      "institution": "جامعة الملك سعود"
+    },
+    "AKANJI2022": {
+      "title": "Akanji, M.A., Ahmad, M., Al-Wabel, M.I., Al-Farraj, A.S.F. (2022). Soil Phosphorus Fractionation and Bio-Availability in a Calcareous Soil as Affected by Conocarpus Waste Biochar and Its Acidified Derivative. Agriculture 12(12), 2157.",
+      "url": "https://www.mdpi.com/2077-0472/12/12/2157",
+      "type": "بحث محكّم",
+      "institution": "جامعة الملك سعود"
+    }
+  },
+  "agent_rules_ar": [
+    "لا تذكر نسبة توفير محددة في مياه الري، لأن الأبحاث تقيس رطوبة التربة والتبخر وليس استهلاك الري. قل: يرفع احتفاظ التربة بالماء حسب تجارب مخبرية وصوبات.",
+    "اذكر المصدر ونوع التجربة (مختبر أو صوبة) مع كل رقم.",
+    "إذا كان pH التربة 8 أو أكثر، نبّه إلى أن الفحم قد يرفع القلوية واقترح خلطه بالسماد العضوي أو استخدام فحم معالج، واطلب استشارة مختص.",
+    "إذا كانت مياه الري مالحة، نبّه إلى أن الفحم قد يرفع ملوحة التربة.",
+    "الجرعة المرجعية 2% وزناً للتربة الرملية حسب ALKHASHA2018، وهي نقطة بداية وليست وصفة نهائية.",
+    "إذا سُئلت عن شيء غير موجود في قاعدة المعرفة، قل إنك لا تملك معلومة موثقة عنه."
+  ],
+  "records": [
+    {
+      "id": "ctx-01",
+      "topic": "سياق",
+      "text_ar": "يبلغ عدد أشجار النخيل في المملكة أكثر من 37 مليون نخلة عام 2023، منها 31 مليون نخلة مثمرة، وبلغ إنتاج التمور 1,903 ألف طن.",
+      "source_id": "GASTAT2023",
+      "evidence_level": "إحصاء رسمي",
+      "values": {
+        "palms_total_million": 37,
+        "palms_fruitful_million": 31,
+        "dates_production_thousand_tons": 1903,
+        "year": 2023
+      }
+    },
+    {
+      "id": "ctx-02",
+      "topic": "سياق",
+      "text_ar": "يُقدّر متوسط مخلفات النخلة الواحدة بنحو 35 كجم سنوياً، وتُقدّر المخلفات الإجمالية في المملكة بنحو مليون طن متري.",
+      "source_id": "NASSER2016",
+      "evidence_level": "تقدير في بحث محكّم",
+      "values": {
+        "residue_kg_per_palm_per_year": 35,
+        "total_residue_million_tons_estimate": 1
+      },
+      "caveat_ar": "تقدير منشور عام 2016 ويستند إلى دراسة أقدم (El-Juhany 2001)، وليس إحصاءً رسمياً حديثاً. يُذكر بصيغة «يُقدّر»."
+    },
+    {
+      "id": "ctx-03",
+      "topic": "سياق",
+      "text_ar": "تُحرق مخلفات النخيل سنوياً في المزارع بسبب غياب استراتيجيات معالجة فعالة.",
+      "source_id": "FAIAD2022",
+      "evidence_level": "بحث محكّم"
+    },
+    {
+      "id": "ctx-04",
+      "topic": "سياق",
+      "text_ar": "نحو 80% من المياه المستهلكة في الزراعة تأتي من مياه جوفية غير متجددة، والطلب الزراعي على المياه نحو 12 مليار متر مكعب.",
+      "source_id": "MEWA_WATER",
+      "evidence_level": "وثيقة رسمية",
+      "values": {
+        "ag_water_nonrenewable_groundwater_pct": 80,
+        "ag_water_demand_billion_m3": 12
+      }
+    },
+    {
+      "id": "bc-01",
+      "topic": "إنتاج الفحم",
+      "text_ar": "أُنتج الفحم الحيوي في أبحاث جامعة الملك سعود من بقايا النخيل (السعف والجريد) بالتحلل الحراري عند 400 إلى 450 درجة مئوية في بيئة محدودة الأكسجين.",
+      "source_id": "ALKHASHA2018",
+      "evidence_level": "بحث محكّم",
+      "values": {
+        "pyrolysis_temp_c_min": 400,
+        "pyrolysis_temp_c_max": 450
+      }
+    },
+    {
+      "id": "bc-02",
+      "topic": "الاحتفاظ بالماء",
+      "text_ar": "في تربة رملية لومية، رفع الفحم الحيوي من بقايا النخيل محتوى الماء عند السعة الحقلية بنسبة 6.64% عند إضافة 2%، وحتى 9.77% عند إضافة 8%، مقارنة بالتربة بدون فحم.",
+      "source_id": "ALKHASHA2018",
+      "evidence_level": "تجربة مخبرية (أعمدة تربة)",
+      "values": {
+        "fc_increase_pct_at_2pct": 6.64,
+        "fc_increase_pct_at_8pct": 9.77
+      },
+      "conditions": {
+        "soil": "رملية لومية من مزرعة جامعة الملك سعود",
+        "setting": "مختبر",
+        "crop": "لا يوجد"
+      },
+      "caveat_ar": "نتيجة مخبرية بدون نبات، والأثر الميداني يحتاج تجربة."
+    },
+    {
+      "id": "bc-03",
+      "topic": "التبخر",
+      "text_ar": "إضافة 2% من فحم بقايا النخيل خفّضت التبخر التراكمي من التربة الرملية بنسبة 29.27%، وحفظت 23.60 مم من الماء مقابل 7.98 مم للتربة بدون فحم خلال دورات التبخر.",
+      "source_id": "ALKHASHA2018",
+      "evidence_level": "تجربة مخبرية (أعمدة تربة)",
+      "values": {
+        "evaporation_reduction_pct_at_2pct": 29.27,
+        "water_conserved_mm_biochar": 23.6,
+        "water_conserved_mm_control": 7.98
+      }
+    },
+    {
+      "id": "bc-04",
+      "topic": "التسرب",
+      "text_ar": "إضافة 2% من فحم بقايا النخيل خفّضت معدل التسرب في التربة الرملية بنسبة 32.73%، وخفّضت التوصيل الهيدروليكي المشبع بمتوسط 85.35%، أي أن الماء يبقى في منطقة الجذور مدة أطول.",
+      "source_id": "ALKHASHA2018",
+      "evidence_level": "تجربة مخبرية (أعمدة تربة)",
+      "values": {
+        "infiltration_rate_reduction_pct_at_2pct": 32.73,
+        "ks_reduction_avg_pct": 85.35
+      }
+    },
+    {
+      "id": "bc-05",
+      "topic": "الجرعة الموصى بها",
+      "text_ar": "أوصى الباحثون بنسبة 2% من الفحم الحيوي للتربة الرملية في البيئات الجافة.",
+      "source_id": "ALKHASHA2018",
+      "evidence_level": "توصية الباحثين",
+      "values": {
+        "recommended_rate_pct_w_w": 2
+      },
+      "caveat_ar": "توصية مبنية على تجربة مخبرية. الجرعة الميدانية تُضبط بعد التجربة الميدانية."
+    },
+    {
+      "id": "bc-06",
+      "topic": "الاحتفاظ بالماء",
+      "text_ar": "في صوبة قرب الرياض، رفع فحم سعف النخيل بنسبة 4% رطوبة تربة رملية لومية (81% رمل) مزروعة بالطماطم بنحو 5 إلى 8% مقارنة بالري الكامل بدون فحم، تحت أنظمة ري مختلفة.",
+      "source_id": "ALGHAMDI2022",
+      "evidence_level": "تجربة أصص في صوبة",
+      "values": {
+        "moisture_increase_pct_min": 5,
+        "moisture_increase_pct_max": 8,
+        "rate_pct_w_w": 4,
+        "soil_sand_pct": 81
+      },
+      "conditions": {
+        "crop": "طماطم",
+        "setting": "صوبة",
+        "location": "قرب الرياض"
+      }
+    },
+    {
+      "id": "bc-07",
+      "topic": "الري الناقص",
+      "text_ar": "بدون فحم، انخفضت رطوبة التربة نحو 25 إلى 27% تحت الري الناقص مقارنة بالري الكامل.",
+      "source_id": "ALGHAMDI2022",
+      "evidence_level": "تجربة أصص في صوبة",
+      "values": {
+        "moisture_drop_deficit_pct_min": 25,
+        "moisture_drop_deficit_pct_max": 27
+      }
+    },
+    {
+      "id": "bc-08",
+      "topic": "الملوحة",
+      "text_ar": "سُجّلت ملوحة تربة بين 0.7 و2.1 ديسيسيمنز/م مع الفحم، مقابل 0.5 إلى 1.4 بدونه.",
+      "source_id": "ALGHAMDI2022",
+      "evidence_level": "تجربة أصص في صوبة",
+      "values": {
+        "ec_with_biochar_ds_m": [
+          0.7,
+          2.1
+        ],
+        "ec_without_biochar_ds_m": [
+          0.5,
+          1.4
+        ]
+      },
+      "caveat_ar": "الفحم قد يرفع ملوحة التربة، فيُراقب مع مياه الري المالحة."
+    },
+    {
+      "id": "bc-09",
+      "topic": "القلوية",
+      "text_ar": "في تربة كلسية قلوية (pH 8.20 و42.5% كربونات كالسيوم)، رفع الفحم الحيوي العادي الـ pH من 8.12 إلى 8.47، بينما خفّضه الفحم المعالج حمضياً. وكان pH الفحم نفسه 9.83.",
+      "source_id": "AKANJI2022",
+      "evidence_level": "تجربة على تربة كلسية",
+      "values": {
+        "soil_ph": 8.2,
+        "caco3_pct": 42.5,
+        "ph_control": 8.12,
+        "ph_with_biochar_5pct": 8.47,
+        "biochar_ph": 9.83
+      },
+      "caveat_ar": "الفحم في هذا البحث من مخلفات الكونوكاربس وليس النخيل. يُستخدم للتنبيه إلى أثر الفحم على قلوية التربة."
+    },
+    {
+      "id": "bc-10",
+      "topic": "الفسفور",
+      "text_ar": "الفحم المعالج حمضياً لم يرفع توفر الفسفور بشكل معنوي في التربة الكلسية المدروسة.",
+      "source_id": "AKANJI2022",
+      "evidence_level": "تجربة على تربة كلسية"
+    }
+  ]
+}
