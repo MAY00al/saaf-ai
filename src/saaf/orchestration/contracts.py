@@ -1,5 +1,6 @@
 """Shared graph state and ports for SAAF capabilities."""
 
+from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +9,7 @@ from typing_extensions import TypedDict
 from saaf.agents.impact import ImpactResult
 from saaf.agents.recommendation import RecommendationResponse
 from saaf.collection.models import CollectionResult, PickupDraft
+from saaf.monitoring.models import CountReview, MonitoringResult
 
 Capability = Literal["recommendation", "collection", "monitoring", "impact"]
 Intent = Literal["recommendation", "collection", "monitoring", "impact", "clarification", "unsupported"]
@@ -24,6 +26,7 @@ class ConversationContext(BaseModel):
     previous_query: str | None = Field(default=None, max_length=4000)
     previous_intent: Capability | None = None
     pickup_draft: PickupDraft | None = None
+    count_review: CountReview | None = None
 
 
 class OrchestrationResponse(BaseModel):
@@ -35,6 +38,7 @@ class OrchestrationResponse(BaseModel):
     recommendation: RecommendationResponse | None = None
     collection: CollectionResult | None = None
     impact: ImpactResult | None = None
+    monitoring: MonitoringResult | None = None
 
 
 class AgentState(TypedDict, total=False):
@@ -46,18 +50,13 @@ class AgentState(TypedDict, total=False):
     clarification_ar: str | None
     agent_query: str
     collection_continuing: bool
+    image_path: Path | None
+    whole_farm: bool
     response: OrchestrationResponse
 
 
 class RecommendationPort(Protocol):
     def recommend(self, query: str, farm_id: str | None = None) -> RecommendationResponse: ...
-
-
-class FutureAgentRequest(BaseModel):
-    """Common envelope for later capability-specific request payloads."""
-
-    query: str
-    farm_id: str | None
 
 
 class CollectionPort(Protocol):
@@ -68,7 +67,10 @@ class CollectionPort(Protocol):
 
 
 class MonitoringPort(Protocol):
-    def inspect_palms(self, request: FutureAgentRequest) -> OrchestrationResponse: ...
+    def inspect_palms(self, farm_id: str | None, image: Path | None, *,
+                      whole_farm: bool = False) -> MonitoringResult: ...
+
+    def confirm_count(self, farm_id: str | None, review: CountReview | None) -> MonitoringResult: ...
 
 
 class ImpactPort(Protocol):

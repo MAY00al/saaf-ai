@@ -28,13 +28,17 @@ Use a single Python application with FastAPI as the HTTP boundary in Phase 7. La
 
 **Farm flow.** Validate and transactionally import fixtures keyed by farm ID. Keep simulation origin explicit and distinguish measured, estimated, and unknown fields. Farm lookups supply typed context. Query results from a simulated profile keep that label through routing, calculation, and HTTP serialization.
 
-**Control flow.** The CLI invokes an acyclic LangGraph with a typed `AgentState`. A normalized Arabic rule-based router selects recommendation, collection, or impact, or requests clarification. A turn runs at most one agent. The Recommendation Agent calls typed read-only farm and evidence tools that validate arguments, farm identity, and evidence membership. The graph preserves structured output and maps failures to Arabic messages. Monitoring retains its explicit port and returns `not_implemented`.
+**Control flow.** The CLI invokes an acyclic LangGraph with a typed `AgentState`. A normalized Arabic rule-based router selects recommendation, collection, impact, or monitoring, or requests clarification. A turn runs at most one agent. The Recommendation Agent calls typed read-only farm and evidence tools that validate arguments, farm identity, and evidence membership. The graph preserves structured output and maps failures to Arabic messages.
 
 Conversation context is supplied by the caller and returned with each result. It holds an active farm ID, the last supported intent and question, and a temporary collection draft. A recognized follow-up can reuse the previous question for the same farm. Switching farms discards the previous question and draft. Conflicting IDs stop dispatch. The interactive CLI keeps this context in memory. A future remote API must hold drafts in trusted session state.
 
 **Collection.** The collection service reads the simulation profile, captures the user's quantity in kilograms, and proposes the next simulated availability date. It checks farm identity and proposal date at confirmation. The SQLite `collection_requests` table stores request ID, farm foreign key, requested quantity, pickup date, creation timestamp, status, and simulation flag. A unique farm/date/quantity key makes repeated writes idempotent. Tracking is farm-scoped. Cancellation records a local status transition.
 
 **Impact.** Deterministic aggregation computes registry totals and confirmed request quantities, plus status counts by region. The chat model selects how to frame the precomputed report in Arabic. A fixed fallback explains the report without provider access. Environmental indicators return typed missing-data lists until applicable measurements and documented factors are available.
+
+**Monitoring.** The local CPU adapter loads only explicitly configured date palm weights and runs on a decoded JPEG or PNG. Predictions are image-scoped and retain pixel-space boxes, confidence scores, image and model identifiers, and an annotated PNG. An attested whole-farm image enables a review record scoped to the active farm. A separate confirmation uses a transaction and compares the previous count and observation ID before replacing the simulation's count and residue estimate. Confirmed predictions carry their own provenance. A farm switch discards the pending review. The GPU training and held-out evaluation workflow lives in a [separate Colab notebook](notebooks/train_palm_yolo_colab.ipynb).
+
+The Colab workflow audits the pinned Al Ain TIFF/Pascal VOC release, converts paired examples to PNG/YOLO, and creates a seeded image-level split. The experimental report records exact source revision and declares spatial independence unverified. Independently sourced, labeled imagery is required for any claim of geographic generalization.
 
 ## Proposed contracts
 
@@ -48,7 +52,7 @@ Agent results carry a status (`ok`, `needs_input`, `insufficient_evidence`, or `
 | Orchestrator | Arabic request and structured context such as farm ID | Routed agent result or a clarification. Validates tool inputs and preserves evidence and provenance. |
 | Collection Agent | Farm ID and confirmed pickup details, plus optional facility and routing inputs | Internal request draft and missing inputs, or a proposed plan when the required logistics data exist. Uses explicit availability and capacity inputs. |
 | Impact Agent | Scenario boundary and baseline, activity quantities, and applicable sourced factors | Reproducible scenario estimate with method, units, assumptions, and uncertainty where supported. Deterministic calculations run in a service. Missing factors produce an explicit data gap. |
-| Palm Monitoring Agent | Authorized image reference, image metadata, and optional parcel geometry | Georeferenced observations when supported, count estimate, model identity, and quality flags, or unavailable. YOLO inference is isolated behind an adapter and gated by validation. |
+| Palm Monitoring Agent | Local authorized aerial image, simulation farm ID, optional whole-farm attestation | Image-scoped detections, annotated image, waste estimate, and optional pending review. A matching separate confirmation can persist the predicted count with provenance. |
 
 ## Directory layout
 

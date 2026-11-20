@@ -45,6 +45,8 @@ class FarmProvenance(BaseModel):
     residue_kg_per_palm_per_year: int = RESIDUE_KG_PER_PALM_PER_YEAR
     residue_source_id: Literal["NASSER2016"] = "NASSER2016"
     residue_record_id: Literal["ctx-02"] = "ctx-02"
+    palm_count_origin: Literal["simulation", "model_prediction"] = "simulation"
+    palm_count_observation_id: str | None = None
 
 
 class FarmProfile(Farm):

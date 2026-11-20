@@ -1,0 +1,20 @@
+{
+  "dataset_commit": "593352ae5f0e8fa460ad30afd13cc95c01bcc056",
+  "scope": "experimental Al Ain image-level test",
+  "spatial_independence": "unverified",
+  "claims_geographic_generalization": false,
+  "precision": 0.9767454431970316,
+  "recall": 0.9696234967747402,
+  "mAP50": 0.9925171427040334,
+  "mAP50-95": 0.7894947616940604,
+  "count_mae_per_image": 1.6989247311827957,
+  "test_images": 93,
+  "count_capped_images": 0,
+  "confidence": 0.25,
+  "imgsz": 640,
+  "max_detections": 3000,
+  "seed": 2026,
+  "ultralytics": "8.3.230",
+  "torch": "2.14.1+cu130",
+  "weights_sha256": "e2f4b81d01f196a96256c03b74d07df9599fe883d13d11ba94a61b49eebf2ef3"
+}

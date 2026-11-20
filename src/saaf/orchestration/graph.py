@@ -1,5 +1,7 @@
 """A single-dispatch LangGraph for Arabic SAAF requests."""
 
+from pathlib import Path
+
 from langgraph.graph import END, START, StateGraph
 from pydantic import TypeAdapter
 
@@ -9,11 +11,18 @@ from saaf.collection.commands import confirmation_action, has_quantity_input
 from saaf.providers import RATE_LIMIT_AR, is_rate_limited
 
 from .contracts import (
-    AgentState, CollectionPort, ConversationContext, ImpactPort, OrchestrationResponse, RecommendationPort,
+    AgentState, CollectionPort, ConversationContext, ImpactPort, MonitoringPort,
+    OrchestrationResponse, RecommendationPort,
 )
-from .routing import INLINE_FARM, classify, is_followup, mentions_other_farm
+from .routing import INLINE_FARM, classify, is_followup, mentions_other_farm, normalize
 
 _FARM_ID = TypeAdapter(FarmId)
+
+
+def _confirm_count(query: str) -> bool:
+    return normalize(query).rstrip(".!").strip() in {"اوكد تحديث العدد", "اكد تحديث العدد"}
+
+
 _LABELS = {
     "recommendation": "التوصية العلمية",
     "collection": "جمع المخلفات",
@@ -52,6 +61,13 @@ def _route(state: AgentState) -> AgentState:
         has_quantity_input(query) or INLINE_FARM.fullmatch(query.strip())
     ):
         intent, candidates = "collection", ("collection",)
+    if _confirm_count(query):
+        if state.get("image_path") is not None:
+            return {"intent": "clarification", "context": context,
+                    "clarification_ar": "أرسل تأكيد العدد في رسالة مستقلة عن الصورة الجديدة."}
+        intent, candidates = "monitoring", ("monitoring",)
+    elif state.get("image_path") is not None and intent in {"clarification", "unsupported"} and not candidates:
+        intent, candidates = "monitoring", ("monitoring",)
     agent_query = query
     if intent == "recommendation" and is_followup(query) and context.previous_query:
         agent_query = f"السؤال السابق: {context.previous_query}\nالسؤال الحالي: {query}"
@@ -59,6 +75,7 @@ def _route(state: AgentState) -> AgentState:
         context = ConversationContext(
             farm_id=active_id, previous_query=query, previous_intent=candidates[0],
             pickup_draft=context.pickup_draft,
+            count_review=context.count_review,
         )
     elif intent in {"clarification", "unsupported"}:
         # Avoid resolving a later vague follow-up using an abandoned request.
@@ -99,26 +116,29 @@ class Orchestrator:
 
     def __init__(
         self, recommendation: RecommendationPort, *, collection: CollectionPort | None = None,
-        impact: ImpactPort | None = None,
+        impact: ImpactPort | None = None, monitoring: MonitoringPort | None = None,
     ) -> None:
         self.recommendation = recommendation
         self.collection = collection
         self.impact = impact
+        self.monitoring = monitoring
         graph = StateGraph(AgentState)
         graph.add_node("route", _route)
         graph.add_node("recommend", self._recommend)
         graph.add_node("collect", self._collect)
         graph.add_node("impact_report", self._impact)
+        graph.add_node("monitor", self._monitor)
         graph.add_node("respond", _respond_without_agent)
         graph.add_edge(START, "route")
         graph.add_conditional_edges(
             "route", self._dispatch,
             {"recommend": "recommend", "collect": "collect",
-             "impact_report": "impact_report", "respond": "respond"},
+             "impact_report": "impact_report", "monitor": "monitor", "respond": "respond"},
         )
         graph.add_edge("recommend", END)
         graph.add_edge("collect", END)
         graph.add_edge("impact_report", END)
+        graph.add_edge("monitor", END)
         graph.add_edge("respond", END)
         self._graph = graph.compile()
 
@@ -130,7 +150,34 @@ class Orchestrator:
             return "collect"
         if intent == "impact" and self.impact is not None:
             return "impact_report"
+        if intent == "monitoring" and self.monitoring is not None:
+            return "monitor"
         return "respond"
+
+    def _monitor(self, state: AgentState) -> AgentState:
+        context = state["context"]
+        candidates = state["candidate_intents"]
+        try:
+            if _confirm_count(state["query"]):
+                result = self.monitoring.confirm_count(context.farm_id, context.count_review)
+            else:
+                result = self.monitoring.inspect_palms(
+                    context.farm_id, state.get("image_path"), whole_farm=state.get("whole_farm", False),
+                )
+            if ((result.observation and result.observation.farm_id != context.farm_id)
+                    or (result.pending_review and result.pending_review.farm_id != context.farm_id)
+                    or (result.updated_farm_id and result.updated_farm_id != context.farm_id)):
+                raise ValueError("monitoring result returned a different farm")
+        except Exception:
+            return {"response": OrchestrationResponse(
+                intent="monitoring", status="unavailable", context=context, candidate_intents=candidates,
+                answer_ar="تعذّر تشغيل الرصد المحلي حالياً. تحقق من إعدادات الصورة والأوزان.",
+            )}
+        context = context.model_copy(update={"count_review": result.pending_review})
+        return {"response": OrchestrationResponse(
+            intent="monitoring", status=result.status, context=context, answer_ar=result.answer_ar,
+            candidate_intents=candidates, monitoring=result,
+        )}
 
     def _collect(self, state: AgentState) -> AgentState:
         context = state["context"]
@@ -193,6 +240,7 @@ class Orchestrator:
 
     def run(
         self, query: str, *, context: ConversationContext | None = None, farm_id: str | None = None,
+        image_path: Path | None = None, whole_farm: bool = False,
     ) -> OrchestrationResponse:
         context = context if context is not None else ConversationContext()
         try:
@@ -202,13 +250,16 @@ class Orchestrator:
                 _FARM_ID.validate_python(context.farm_id, strict=True)
             if not isinstance(query, str) or len(query) > 4000:
                 raise ValueError("invalid query")
+            if type(whole_farm) is not bool or (image_path is not None and not isinstance(image_path, Path)):
+                raise ValueError("invalid monitoring input")
         except ValueError:
             return OrchestrationResponse(
                 intent="clarification", status="needs_input", context=context,
                 answer_ar="أرسل سؤالاً مختصراً ومعرّف مزرعة صالحاً إن لزم.",
             )
         state = self._graph.invoke(
-            {"query": query, "context": context, "requested_farm_id": farm_id},
+            {"query": query, "context": context, "requested_farm_id": farm_id,
+             "image_path": image_path, "whole_farm": whole_farm},
             config={"recursion_limit": 4},
         )
         return state["response"]

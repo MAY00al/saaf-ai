@@ -1,12 +1,16 @@
 # Implementation roadmap
 
-Phases 0–4 delivered the scaffold, scientific retrieval, farm repository, recommendation agent, and LangGraph routing. Phase 5 adds simulated collection confirmation and deterministic impact reporting. See [README.md](README.md) for CLI workflows and tests. Phase 6 requires owner approval.
+Phases 0–5 delivered the scaffold, scientific retrieval, farm repository, recommendation, routing, collection, and impact. Phase 6 adds local CPU monitoring and a Colab workflow for the Al Ain dataset. The trained checkpoint and its matching evaluation report are installed locally. See [README.md](README.md) for CLI workflows and tests. Phase 7 requires owner approval.
 
 Phase 3 verification passed 61 offline tests and one live Gemini integration test covering a cited Saudi dialect query and an unsupported irrigation-savings request. Corpus-wide live retrieval calibration remains open.
 
 Phase 4 verification matched all 28 labeled routing cases. The offline integration tests verify status, citation and provenance preservation, and provider error handling separately. Broader dialect coverage and live answer quality were outside that benchmark.
 
 Phase 5 verification passed 118 offline tests, including the earlier regression suites, concurrent duplicate confirmation, farm-scoped tracking, regional aggregates, and environmental data-gap responses.
+
+The Phase 6 dataset audit verified 922 annotated images split into 737 train, 92 validation, and 93 test. The [checkpoint report](models/evaluation_report.json) records 97.67% precision, 96.96% recall, 99.25% mAP50, 78.95% mAP50–95, and 1.70 palms per image counting MAE. Geographic independence remains unverified.
+
+The trained checkpoint passed local CPU inference through LangGraph on three held-out tiles. All 126 offline regression tests passed.
 
 | Phase | Deliverable | Acceptance criteria |
 | --- | --- | --- |
@@ -15,5 +19,5 @@ Phase 5 verification passed 118 offline tests, including the earlier regression 
 | 3. Recommendation Agent | Cited Arabic recommendations based on retrieval and optional farm context | Pytest cases cover pH below, at, and above 8, salinity true and unknown, missing farm attributes, and simulated inputs. The agent preserves study conditions and feedstock, labels the 2% reference appropriately, declines unsupported claims, and gives no numerical irrigation savings. Every numerical claim has a supporting evidence record. |
 | 4. Orchestration and tools | Typed LangGraph routing with recommendation, farm, and evidence tools | Evaluate at least 20 Arabic routing scenarios separately from answer quality. Test ambiguous and multi-intent inputs, invalid arguments, unavailable capabilities, provider failures, farm context isolation, and bounded execution. Agent outputs retain citations and simulation provenance across the graph. |
 | 5. Collection and impact | Internal pickup workflow and deterministic scenario assessment | Missing actual pickup quantities or logistics yield a draft or data-gap response. Retry tests demonstrate idempotent writes. Impact tests cover known calculations with sourced inputs or clearly synthetic test fixtures, incompatible units, missing factors, and simulation labeling. No unsupported CO₂e or water savings are returned. |
-| 6. Palm monitoring | Imagery intake, observation contract, and gated YOLO integration | Verify imagery licensing, resolution, labeling, independent farm-level splits, and owner-agreed detection and count-error thresholds before claiming model capability. Report held-out precision, recall, and count error when suitable data and a model are available. Otherwise verify the unavailable path end to end and record the capability as deferred. Test unusable imagery and confirm detections never overwrite farm records without review. |
+| 6. Palm monitoring | Imagery intake, observation contract, and gated YOLO integration | Verify dataset terms, imagery, annotations, duplicates, and fixed split membership before GPU training. Report precision, recall, mAP50, mAP50–95, and counting MAE for the experimental test split. Require geographically independent evaluation and owner-agreed thresholds before claiming geographic generalization. Test unusable imagery and confirm detections never overwrite farm records without review. |
 | 7. FastAPI and end-to-end testing | HTTP endpoints, dependency wiring, and documented local startup | Validate request and response contracts and error mappings. Pytest exercises Arabic recommendation, simulated farm lookup, pickup and impact outcomes, and monitoring success or explicit unavailability through HTTP using isolated stores and deterministic provider doubles. Document a separate live-provider smoke test and run it when credentials are available. Verify provenance, confidentiality of secrets, and predictable error responses. |

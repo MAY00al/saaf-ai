@@ -29,7 +29,28 @@ CREATE TABLE IF NOT EXISTS farms (
     CHECK ((origin = 'local_simulation') = (seed_file IS NULL))
 );
 CREATE INDEX IF NOT EXISTS farms_region_idx ON farms (region);
+CREATE TABLE IF NOT EXISTS farm_palm_observations (
+    observation_id TEXT NOT NULL PRIMARY KEY,
+    farm_id TEXT NOT NULL REFERENCES farms(farm_id) ON DELETE CASCADE,
+    predicted_count INTEGER NOT NULL CHECK (predicted_count >= 0),
+    previous_count INTEGER NOT NULL CHECK (previous_count >= 0),
+    model_id TEXT NOT NULL,
+    image_sha256 TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL,
+    active INTEGER NOT NULL CHECK (active IN (0, 1))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS active_farm_palm_observation_idx
+ON farm_palm_observations(farm_id) WHERE active = 1;
+CREATE TRIGGER IF NOT EXISTS invalidate_palm_observation
+AFTER UPDATE OF palm_count ON farms WHEN NEW.palm_count != OLD.palm_count
+BEGIN
+    UPDATE farm_palm_observations SET active = 0 WHERE farm_id = NEW.farm_id AND active = 1;
+END;
 """
+_SELECT = """SELECT farms.*, (
+    SELECT observation_id FROM farm_palm_observations o
+    WHERE o.farm_id = farms.farm_id AND o.active = 1
+) AS palm_observation_id FROM farms"""
 _FARM_FIELDS = tuple(Farm.model_fields)
 _STORED_FIELDS = (*_FARM_FIELDS, "origin", "seed_file")
 _INSERT = (
@@ -50,9 +71,12 @@ def _profile(row: sqlite3.Row) -> FarmProfile:
     data["simulated"] = bool(data["simulated"])
     if data["irrigation_water_saline"] is not None:
         data["irrigation_water_saline"] = bool(data["irrigation_water_saline"])
-    return FarmProfile(
-        **data, provenance=FarmProvenance(origin=row["origin"], seed_file=row["seed_file"]),
-    )
+    observation_id = row["palm_observation_id"]
+    return FarmProfile(**data, provenance=FarmProvenance(
+        origin=row["origin"], seed_file=row["seed_file"],
+        palm_count_origin="model_prediction" if observation_id else "simulation",
+        palm_count_observation_id=observation_id,
+    ))
 
 
 class FarmRepository:
@@ -97,7 +121,7 @@ class FarmRepository:
         if not farm_id or not farm_id.strip():
             return None
         with closing(self._connect()) as connection:
-            row = connection.execute("SELECT * FROM farms WHERE farm_id = ?", (farm_id,)).fetchone()
+            row = connection.execute(_SELECT + " WHERE farm_id = ?", (farm_id,)).fetchone()
         return _profile(row) if row is not None else None
 
     def update_farm(self, farm_id: str, **changes: object) -> FarmProfile | None:
@@ -106,7 +130,7 @@ class FarmRepository:
             raise ValueError("farm_id and simulated are immutable")
         with closing(self._connect()) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT * FROM farms WHERE farm_id = ?", (farm_id,)).fetchone()
+            row = connection.execute(_SELECT + " WHERE farm_id = ?", (farm_id,)).fetchone()
             if row is None:
                 return None
             current = _profile(row)
@@ -121,7 +145,8 @@ class FarmRepository:
             seed_file = current.provenance.seed_file
             origin = "edited_seed" if seed_file is not None else "local_simulation"
             connection.execute(_UPDATE, dict(data, origin=origin, seed_file=seed_file))
-        return FarmProfile(**data, provenance=FarmProvenance(origin=origin, seed_file=seed_file))
+            row = connection.execute(_SELECT + " WHERE farm_id = ?", (farm_id,)).fetchone()
+        return _profile(row)
 
     def delete_farm(self, farm_id: str) -> bool:
         with closing(self._connect()) as connection, connection:
@@ -130,10 +155,10 @@ class FarmRepository:
     def list_farms(self, *, region: str | None = None) -> list[FarmProfile]:
         with closing(self._connect()) as connection:
             if region is None:
-                rows = connection.execute("SELECT * FROM farms ORDER BY farm_id").fetchall()
+                rows = connection.execute(_SELECT + " ORDER BY farm_id").fetchall()
             else:
                 rows = connection.execute(
-                    "SELECT * FROM farms WHERE region = ? ORDER BY farm_id", (region,),
+                    _SELECT + " WHERE region = ? ORDER BY farm_id", (region,),
                 ).fetchall()
         return [_profile(row) for row in rows]
 

@@ -20,3 +20,10 @@ dist/
 *.sqlite-shm
 *.sqlite3-wal
 *.sqlite3-shm
+/datasets/
+/weights/
+/runs/
+.ipynb_checkpoints/
+*.pt
+*.onnx
+*.safetensors

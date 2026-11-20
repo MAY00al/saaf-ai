@@ -2,7 +2,7 @@
 
 SAAF is an Arabic-first AI platform for date palm residue management, evidence-grounded biochar recommendations, collection planning, environmental impact assessment, and palm monitoring.
 
-SAAF supports Arabic scientific retrieval, simulated farm profiles, recommendations, LangGraph routing, simulated collection requests, and impact reporting. Phase 6 requires owner approval.
+SAAF supports Arabic scientific retrieval, simulated farm profiles, recommendations, LangGraph routing, simulated collection requests, impact reporting, and local palm monitoring with configured weights. Phase 7 requires owner approval.
 
 | Input | Intended use |
 | --- | --- |
@@ -92,7 +92,7 @@ python -m pytest -q tests/live_orchestration.py
 
 The interactive CLI keeps the active farm and last supported request in memory. Use `/farm ID` to select a farm for the next turn, `/reset` to clear context, and `/exit` to quit. An inline `SIM-NNN` also supplies the farm ID. A switch to another farm clears the previous question. Conflicting IDs and multi-intent requests ask for clarification.
 
-Routing uses normalized Arabic phrases and selected Saudi expressions. Recommendation uses the configured providers. Impact can use the chat provider to select an explanation of computed results and falls back to a deterministic Arabic explanation. Monitoring returns `not_implemented`. The routing benchmark measures intent and candidate matching on the labeled examples. The explicit live test is excluded from the default suite.
+Routing uses normalized Arabic phrases and selected Saudi expressions. Recommendation uses the configured providers. Impact can use the chat provider to select an explanation of computed results and falls back to a deterministic Arabic explanation. Palm monitoring runs locally and reports missing imagery or model weights in Arabic. The routing benchmark measures intent and candidate matching on the labeled examples. The explicit live test is excluded from the default suite.
 
 ### Simulated collection
 
@@ -109,3 +109,25 @@ Demo pickups use the next future Monday, Wednesday, or Saturday in Riyadh time. 
 Ask `وش إجمالي الطلبات حسب المنطقة؟` for the registry and request breakdown, or `كم الكمية المؤكدة في القصيم؟` for a regional report. Reports distinguish estimated annual waste from user-entered quantities on confirmed demo requests. A confirmation represents a recorded request and carries no field fulfillment data.
 
 Requests such as `كم الانبعاثات المتجنبة؟` return `insufficient_data` with the required measurements and factors. The current datasets supply no validated inputs for biochar production, stored carbon, avoided emissions, or measured irrigation savings.
+
+### Local CPU palm monitoring
+
+Install with `python -m pip install -e ".[vision]"`. The local Al Ain checkpoint is `models/best.pt`. The workspace `.env` points to it and uses the report's settings of 0.25 confidence, 640-pixel inference size, and 3,000 maximum detections. For other environments, set these values using [.env.example](.env.example). Keep checkpoints outside Git and load only trusted weights.
+
+```sh
+python -m saaf.orchestration "رصد النخيل" --farm-id SIM-001 --image "datasets/demo/aerial.jpg"
+```
+
+The result includes confidence scores and pixel-space `xyxy` boxes relative to the oriented JPEG or PNG, an annotated PNG, and an annual residue estimate scoped to detected palms using the documented estimate of 35 kg per palm per year. It contains the image hash and model checkpoint identity. The profile stays labeled simulated. Image association uses the supplied farm ID, with no geolocation or parcel verification.
+
+To review a count for storage, open the interactive CLI, select `/farm SIM-001`, supply `/image PATH`, and enter `/whole-farm` only if the authorized image covers the entire farm. Run `رصد النخيل`, inspect the annotation, then enter `أؤكد تحديث العدد` in a separate turn. The confirmed prediction and recalculated residue estimate are written atomically to the demo profile with model provenance. A partial image, a detection-cap result, or a stale review cannot replace the stored count.
+
+### Colab training and evaluation
+
+Open the [Colab notebook](notebooks/train_palm_yolo_colab.ipynb) in a GPU runtime. Review the [Al Ain dataset terms](https://github.com/NourO93/Palm-Tree-Dataset) and set `HACKATHON_USE_COMPLIES = True` only after confirming the intended use meets the research and education restriction. The notebook downloads the pinned archive, excludes unlabeled images, validates and converts the 922 annotated TIFFs, and creates a 737/92/93 experimental split. Enable `RUN_GPU_TRAINING` to fine-tune YOLO11n. The notebook visualizes test predictions and downloads `best.pt` and the evaluation report.
+
+See the [dataset audit](notebooks/PALM_DATASETS.md) for the rejected candidates and split limitations. Spatial independence is unverified, so metrics apply only to this experimental split. Keep datasets, weights, and run artifacts outside Git.
+
+The [Al Ain evaluation report](models/evaluation_report.json) covers 93 held-out images. It reports **97.67% precision**, **96.96% recall**, **99.25% mAP50**, **78.95% mAP50–95**, and **1.70 palms per image counting MAE**. The checkpoint SHA-256 matches the report. Counting MAE measures image tiles. It provides no estimate of whole-farm counting error.
+
+A local CPU smoke test ran the Monitoring Agent through LangGraph on three held-out tiles. It produced annotated PNGs and predicted 13, 6, and 1 palms against 12, 4, and 1 labeled palms. The test left the simulated farm count unchanged.
