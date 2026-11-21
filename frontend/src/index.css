@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@500;700;800&display=swap');
+@import "tailwindcss";
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #F7F3EA;
+  color: #1E2A25;
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+/* التصميم العام */
+.shell { display: flex; min-height: 100vh; }
+.side {
+  flex: 0 0 264px;
+  background: #F7F3EA; /* خلفية بيضاء ناصعة */
+  color: #0B5D3B; /* النصوص باللون الأخضر */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 26px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #E5DCCB; /* خط فاصل خفيف */
+}
+
+.side .logobox {
+  background: transparent; /* إزالة المربع المرقع */
+  padding: 0 0 22px 0;
+  margin: 0 0 22px;
+  display: flex;
+  justify-content: center;
+}
+
+.side .logo { display: block; width: 150px; height: auto; }
+.navlist { display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
+
+.navbtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: #0B5D3B;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: right;
+}
+
+.navbtn:hover { background: #F7F3EA; } /* عند تمرير الماوس */
+.navbtn.active { background: #E6F2EC; color: #0B5D3B; font-weight: 700; } /* عند تحديد الصفحة */
+
+.sidefoot {
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+  background: #F7F3EA;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1E2A25;
+}
+
+.main { flex: 1; min-width: 0; }
+.content { max-width: 1080px; margin: 0 auto; padding: 30px 32px 56px; }
+
+.card {
+  background: #FFFFFF; /* البطاقات بيضاء */
+  border: 1px solid #E5DCCB;
+  border-radius: 22px;
+}
+
+.fld {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid #E5DCCB;
+  background: #F7F3EA;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: 16px;
+  color: #1E2A25;
+}
+
+.btn {
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 16px;
+  border: 0;
+  background: #0B5D3B;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 16.5px;
+  cursor: pointer;
+}
+
+.btn:disabled { background: #C9CFCB; color: #55615A; cursor: not-allowed; }
+.btn2 {
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 16px;
+  border: 1px solid #0B5D3B;
+  background: transparent;
+  color: #0B5D3B;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* التصميم المتجاوب */
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .side { position: static; height: auto; flex: none; padding: 12px; border-left: 0; border-bottom: 1px solid #E5DCCB; }
+  .side .logobox { padding: 6px 12px; margin: 0 0 8px; }
+  .side .logo { width: 100px; }
+  .navlist { flex-direction: row; overflow-x: auto; gap: 4px; }
+  .navbtn { width: auto; white-space: nowrap; padding: 0 14px; min-height: 44px; font-size: 15px; }
+  .navbtn svg { display: none; }
+  .sidefoot { display: none; }
+  .content { padding: 20px 16px 40px; }
+}
+@media print { .side { display: none; } .content { padding: 0; } }
