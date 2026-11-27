@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -20,7 +20,7 @@ function LocationPicker({ setPos }: { setPos: (lat: number, lon: number) => void
 }
 
 export default function Monitor({ setScreen }: { setScreen: (s: string) => void }) {
-  const { sessionId, activeFarmId, profile, setPrefillQuestion } = useAppStore();
+  const { sessionId, activeFarmId, profile, setPrefillQuestion, notify } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +40,45 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
     try {
       await saveBoundary(activeFarmId, pos[0], pos[1]);
       setShowMap(false); // إخفاء الخريطة بعد الحفظ
-      alert('تم حفظ موقع المزرعة بنجاح!');
-    } catch (err) {
-      setError('فشل حفظ الموقع. تأكد من الاتصال بالخادم.');
+      notify('تم حفظ موقع المزرعة بنجاح', 'success');
+    } catch (err: any) {
+      setError(err?.error?.message_ar || 'فشل حفظ الموقع. تأكد من الاتصال بالخادم.');
     } finally { setSavingBoundary(false); }
+  };
+
+  // تحليل صورة جوية (مرفوعة أو تجريبية) بوكيل الرصد
+  const analyzeImage = (file: File) => {
+    if (!sessionId || !activeFarmId) return;
+    setLoading(true); setError(null); setResult(null);
+    detectPalms(sessionId, activeFarmId, file)
+      .then(setResult)
+      .catch((err) => setError(err?.error?.message_ar || 'تعذر تحليل الصورة.'))
+      .finally(() => setLoading(false));
+  };
+
+  // صورة تجريبية اختيارية: ضع الملف في frontend/public/sample-aerial.jpg (أو .png) فيظهر الزر تلقائياً
+  const [sample, setSample] = useState<{ url: string; type: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const ext of ['jpg', 'png']) {
+        try {
+          const res = await fetch(`/sample-aerial.${ext}`);
+          const type = res.headers.get('content-type') || '';
+          if (res.ok && type.startsWith('image/')) {
+            if (alive) setSample({ url: `/sample-aerial.${ext}`, type });
+            return;
+          }
+        } catch { /* لا توجد صورة تجريبية */ }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const useSampleImage = async () => {
+    if (!sample) return;
+    const blob = await (await fetch(sample.url)).blob();
+    analyzeImage(new File([blob], 'sample', { type: sample.type }));
   };
 
   const handleSatellite = async () => {
@@ -150,11 +185,14 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
             <span style={{ fontWeight: 700, fontSize: 18, color: '#0B5D3B' }}>اضغط لاختيار صورة جوية (JPEG أو PNG)</span>
             <input type="file" accept="image/jpeg,image/png" onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (!file || !sessionId || !activeFarmId) return;
-                setLoading(true); setError(null); setResult(null);
-                detectPalms(sessionId, activeFarmId, file).then(setResult).catch((err) => setError(err?.error?.message_ar || 'تعذر تحليل الصورة.')).finally(() => setLoading(false));
+                if (file) analyzeImage(file);
             }} style={{ display: 'none' }} disabled={loading} />
           </label>
+          {sample && (
+            <button className="btn2" onClick={useSampleImage} disabled={loading} style={{ marginTop: 12, width: '100%' }}>
+              🖼️ جرّب بصورة جوية تجريبية
+            </button>
+          )}
         </div>
       )}
 
