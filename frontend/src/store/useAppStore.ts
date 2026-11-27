@@ -11,9 +11,11 @@ interface AppState {
   sessionId: string | null;
   activeFarmId: string | null;
   profile: FarmProfile;
+  prefillQuestion: string | null; // أضفنا هذا
   setSession: (id: string) => void;
   setFarm: (id: string) => void;
   setProfile: (p: Partial<FarmProfile>) => void;
+  setPrefillQuestion: (q: string | null) => void; // أضفنا هذا
 }
 
 export const useAppStore = create<AppState>()(
@@ -33,9 +35,11 @@ export const useAppStore = create<AppState>()(
         irr: 'تنقيط',
         palms: '350'
       },
+      prefillQuestion: null,
       setSession: (id) => set({ sessionId: id }),
       setFarm: (id) => set({ activeFarmId: id }),
       setProfile: (p) => set((state) => ({ profile: { ...state.profile, ...p } })),
+      setPrefillQuestion: (q) => set({ prefillQuestion: q }),
     }),
     { name: 'saaf-storage' }
   )

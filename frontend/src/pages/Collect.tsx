@@ -3,9 +3,14 @@ import { useAppStore } from '../store/useAppStore';
 import { proposeCollection, confirmCollection } from '../api/client';
 
 export default function Collect({ setScreen }: { setScreen: (s: string) => void }) {
-  const { sessionId, activeFarmId } = useAppStore();
+  const { sessionId, activeFarmId, profile } = useAppStore();
+  
+  // حساب المخلفات المتوقعة بناءً على ملف المزرعة (35 كجم لكل نخلة)
+  const palms = parseInt(profile.palms) || 0;
+  const expectedWaste = palms * 35;
+
   const [step, setStep] = useState(1);
-  const [qty, setQty] = useState(300); // كجم
+  const [qty, setQty] = useState(expectedWaste > 0 ? Math.min(expectedWaste, 300) : 300); 
   const [draft, setDraft] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +28,14 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
 
   const handlePropose = async () => {
     if (!sessionId || !activeFarmId) return;
+    
+    // تحقق ذكي: هل الكمية تتجاوز مخلفات المزرعة؟
+    if (qty > expectedWaste && expectedWaste > 0) {
+      if (!window.confirm(`تنبيه: الكمية المطلوبة (${qty} كجم) تتجاوز التقدير السنوي لمزرعتك (${expectedWaste} كجم). هل أنت متأكد؟`)) {
+        return;
+      }
+    }
+
     setLoading(true); setError(null);
     try {
       const res = await proposeCollection(sessionId, activeFarmId, qty);
@@ -51,7 +64,7 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
 
   const stepper = () => (
     <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-      {['تصوير السعف', 'اختيار الشركة', 'الموعد والتأكيد'].map((l, i) => {
+      {['تأكيد الكمية', 'اختيار الشركة', 'الموعد والتأكيد'].map((l, i) => {
         const n = i + 1;
         const on = step === n;
         return (
@@ -77,17 +90,23 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
       {/* الخطوة 1 */}
       {step === 1 && (
         <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <h3 style={{ margin: 0 }}>١. صوّر السعف المجمّع (اختياري)</h3>
+          <h3 style={{ margin: 0 }}>١. حدد الكمية التي تريد جمعها</h3>
+          
+          <div style={{ background: '#F8F1E2', border: '1px solid #C8A25A', padding: 12, borderRadius: 12, fontSize: 14 }}>
+            بناءً على عدد نخيلك (<b>{palms}</b> نخلة)، نقدر أن مزرعتك تنتج <b>{expectedWaste.toLocaleString()}</b> كجم من السعف سنوياً.
+          </div>
+
           <label style={{ border: '2px dashed #0B5D3B', borderRadius: 16, padding: 30, textAlign: 'center', cursor: 'pointer', background: '#F7F3EA' }}>
-            <span style={{ fontWeight: 700, color: '#0B5D3B' }}>اضغط لرفع صورة (محاكاة)</span>
+            <span style={{ fontWeight: 700, color: '#0B5D3B' }}>{photo ? '✓ تم إرفاق صورة السعف (محاكاة)' : 'اضغط لرفع صورة السعف (اختياري)'}</span>
             <input type="file" onChange={() => setPhoto(true)} style={{ display: 'none' }} />
           </label>
-          {photo && <div style={{ color: '#0B5D3B' }}>تم التقاط الصورة (محاكاة)!</div>}
-          <div style={{ marginTop: 20 }}>
-            <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>أدخل الكمية (كجم)</label>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>الكمية المطلوب جمعها (كجم)</label>
             <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} className="fld" />
           </div>
-          <button className="btn" onClick={() => setStep(2)} disabled={!photo}>التالي: اختيار الشركة ←</button>
+          
+          <button className="btn" onClick={() => setStep(2)} style={{ marginTop: 10 }}>التالي: اختيار الشركة ←</button>
         </div>
       )}
 
@@ -95,6 +114,7 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
       {step === 2 && (
         <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <h3 style={{ margin: 0 }}>٢. اختر شركة الجمع</h3>
+          <p style={{ margin: 0, color: '#55615A', fontSize: 14 }}>الشركات المتاحة في منطقة {profile.region}:</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {companies.map((c, i) => (
               <button key={i} onClick={() => setCompany(i)} className={company === i ? 'btn' : 'btn2'} style={{ flex: 1, padding: 16 }}>
@@ -102,9 +122,9 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
             <button className="btn2" onClick={() => setStep(1)}>→ رجوع</button>
-            <button className="btn" onClick={handlePropose} disabled={loading}>{loading ? 'جارٍ الحساب...' : 'التالي: الموعد ←'}</button>
+            <button className="btn" onClick={handlePropose} disabled={loading}>{loading ? 'جارٍ حساب الموعد...' : 'التالي: عرض الموعد ←'}</button>
           </div>
         </div>
       )}
@@ -113,25 +133,38 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
       {step === 3 && draft && (
         <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <h3 style={{ margin: 0 }}>٣. تأكيد الطلب</h3>
-          <div style={{ background: '#F8F1E2', padding: 16, borderRadius: 12 }}>
-            <p>الشركة: {companies[company].name}</p>
-            <p>الكمية: {draft.requested_quantity_kg} كجم</p>
-            <p>تاريخ الاستلام: {draft.pickup_date}</p>
+          <div style={{ background: '#F8F1E2', padding: 16, borderRadius: 12, border: '1px solid #C8A25A' }}>
+            <p><b>الشركة:</b> {companies[company].name}</p>
+            <p><b>الكمية:</b> {draft.requested_quantity_kg} كجم</p>
+            <p><b>تاريخ الاستلام المقترح:</b> {draft.pickup_date}</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn2" onClick={() => setStep(2)}>→ رجوع</button>
-            <button className="btn" onClick={handleConfirm} disabled={loading}>أرسل طلب الجمع</button>
+            <button className="btn" onClick={handleConfirm} disabled={loading}>{loading ? 'جارٍ التأكيد...' : 'أرسل طلب الجمع'}</button>
           </div>
         </div>
       )}
 
-      {/* الخطوة 4 */}
+      {/* الخطوة 4: النجاح والربط بالأثر */}
       {step === 4 && saved && (
         <div className="card" style={{ padding: 40, textAlign: 'center', background: '#E6F2EC' }}>
+          <div style={{ fontSize: 50, marginBottom: 10 }}>🎉</div>
           <h2 style={{ color: '#0B5D3B', fontSize: 28 }}>تم إرسال طلبك بنجاح!</h2>
-          <p>رقم الطلب: <b>{saved.request_id}</b></p>
-          <p>الحالة: {saved.status}</p>
-          <button className="btn" onClick={() => setScreen('impact')} style={{ marginTop: 20 }}>شاهد تقرير الأثر</button>
+          
+          <div style={{ background: '#FFFDF9', padding: 20, borderRadius: 16, display: 'inline-block', margin: '20px 0', border: '1px solid #E5DCCB' }}>
+            <p style={{ margin: 0 }}>رقم الطلب: <b style={{ color: '#0B5D3B' }}>{saved.request_id}</b></p>
+            <p style={{ margin: '8px 0 0 0' }}>الحالة: <b>{saved.status}</b></p>
+          </div>
+
+          <div style={{ background: '#0B5D3B', color: '#fff', padding: 16, borderRadius: 12, marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 18 }}>
+              🌱 تم الحفاظ على <b>{draft?.requested_quantity_kg}</b> كجم من السعف من الحرق المكشوف.
+            </p>
+          </div>
+
+          <button className="btn" onClick={() => setScreen('impact')} style={{ fontSize: 18, padding: '0 40px' }}>
+            شاهد تقرير الأثر البيئي
+          </button>
         </div>
       )}
     </section>
