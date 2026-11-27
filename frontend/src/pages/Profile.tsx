@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { updateFarm } from '../api/client';
 export default function Profile({ setScreen }: { setScreen: (s: string) => void }) {
-  const { profile, setProfile } = useAppStore();
+  const { profile, setProfile, activeFarmId } = useAppStore();
   const [form, setForm] = useState(profile);
 
   // تحديث النموذج إذا تغيرت البيانات في المتجر
@@ -16,19 +16,29 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
 
    const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // تحقق قبل الإرسال: الخادم يرفض المساحة ≤ 0 والأرقام غير الصالحة
+    const soil_ph = Number(form.ph), area_ha = Number(form.area), lat = Number(form.lat), lon = Number(form.lon);
+    const valid = [soil_ph, area_ha, lat, lon].every(Number.isFinite)
+      && area_ha > 0 && soil_ph >= 0 && soil_ph <= 14 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+    if (!valid) {
+      alert('تحقق من القيم: المساحة أكبر من صفر، وpH بين 0 و14، وخط العرض والطول رقمان صحيحان.');
+      return;
+    }
+
     setProfile(form);
-    
+
     try {
-      await updateFarm('SIM-001', {
-        soil_ph: Number(form.ph),
+      await updateFarm(activeFarmId || 'SIM-001', {
+        soil_ph,
         irrigation_system: form.irr,
-        area_ha: Number(form.area),
-        lat: Number(form.lat), // أضفنا خط العرض
-        lon: Number(form.lon), // أضفنا خط الطول
+        area_ha,
+        lat,
+        lon,
       });
       alert('تم حفظ بيانات المزرعة بنجاح!');
       setScreen('monitor');
-    } catch (err) {
+    } catch {
       alert('تم الحفظ محلياً، لكن تعذر المزامنة مع الخادم.');
       setScreen('monitor');
     }
@@ -53,7 +63,7 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
       <form onSubmit={handleSave} className="card" style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 820 }}>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}><label style={{ fontWeight: 700 }}>اسمي</label><input name="owner" className="fld" value={form.owner} onChange={handleChange} /></div>
-          <div style={{ flex: 1 }}><label style={{ fontWeight: 700 }}>رقم الجوال</label><input name="phone" className="fld" value="05XXXXXXXX" onChange={handleChange} /></div>
+          <div style={{ flex: 1 }}><label style={{ fontWeight: 700 }}>رقم الجوال</label><input name="phone" className="fld" placeholder="05XXXXXXXX" onChange={handleChange} /></div>
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}><label style={{ fontWeight: 700 }}>اسم المزرعة</label><input name="name" className="fld" value={form.name} onChange={handleChange} /></div>
