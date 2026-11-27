@@ -62,7 +62,7 @@ export default function Home({ setScreen }: { setScreen: (s: string) => void }) 
         </div>
         <div style={{ flex: '1 1 200px', background: '#E6F2EC', borderRadius: 20, padding: '18px 20px' }}>
           <div style={{ color: '#0B5D3B', fontSize: 14.5, fontWeight: 700 }}>إجمالي المخلفات</div>
-          <div style={{ fontFamily: 'Tajawal', fontWeight: 800, fontSize: 32, marginTop: 4 }}>{stats?.estimated_annual_waste_kg ? Math.round(stats.estimated_annual_waste_kg / 1000) : '...'} طن</div>
+          <div style={{ fontFamily: 'Tajawal', fontWeight: 800, fontSize: 32, marginTop: 4 }}>{stats?.total_est_residue_kg_per_year ? Math.round(stats.total_est_residue_kg_per_year / 1000) : '...'} طن</div>
         </div>
         <div style={{ flex: '1 1 200px', background: '#EAF4EE', borderRadius: 20, padding: '18px 20px' }}>
           <div style={{ color: '#0B5D3B', fontSize: 14.5, fontWeight: 700 }}>الكمية المجمعة</div>
