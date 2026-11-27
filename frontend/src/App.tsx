@@ -11,7 +11,7 @@ import Impact from './pages/Impact';
 
 export default function App() {
   const [screen, setScreen] = useState('home');
-  const { setSession, setProfile } = useAppStore();
+  const { setSession, setProfile, activeFarmId } = useAppStore();
 
   useEffect(() => {
     // 1. إنشاء الجلسة
@@ -22,8 +22,8 @@ export default function App() {
     // 2. جلب مزرعة افتراضية وتجهيز بيانات واضحة أنها "تجريبية"
     getFarms()
       .then((farms) => {
-        // نجلب أول مزرعة من الباك اند (لتكون لها بيانات حقيقية في القاعدة)
-        const defaultFarm = farms[0]; 
+        // نجلب المزرعة النشطة (وإلا أول مزرعة) حتى يتطابق الملف الشخصي مع معرّف المزرعة المستخدم في الطلبات
+        const defaultFarm = farms.find((f) => f.farm_id === activeFarmId) ?? farms[0];
         if (defaultFarm) {
           setProfile({
             owner: 'مستخدم تجريبي (Demo)',
@@ -40,14 +40,14 @@ export default function App() {
         }
       })
       .catch((err) => console.error("فشل جلب المزرعة:", err));
-  }, [setSession, setProfile]);
+  }, [setSession, setProfile, activeFarmId]);
 
   const renderScreen = () => {
     switch (screen) {
       case 'home': return <Home setScreen={setScreen} />;
       case 'profile': return <Profile setScreen={setScreen} />;
       case 'monitor': return <Monitor setScreen={setScreen} />;
-      case 'advisor': return <Advisor />;
+      case 'advisor': return <Advisor setScreen={setScreen} />;
       case 'collect': return <Collect setScreen={setScreen} />;
       case 'impact': return <Impact />;
       default: return <Home setScreen={setScreen} />;
