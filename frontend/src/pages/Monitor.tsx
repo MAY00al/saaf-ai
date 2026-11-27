@@ -50,15 +50,25 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
     if (!activeFarmId) return;
     setLoading(true); setError(null); setResult(null);
     try {
-      const data = await getSatellite(activeFarmId, 'ndvi');
+      let data = await getSatellite(activeFarmId, 'ndvi');
+      // الفحص يحتاج حدوداً مسجلة؛ إن لم تُسجَّل بعد نسجلها تلقائياً من موقع المزرعة ثم نعيد الفحص
+      if (data?.status === 'boundary_required') {
+        await saveBoundary(activeFarmId, pos[0], pos[1]);
+        data = await getSatellite(activeFarmId, 'ndvi');
+      }
       setResult(data);
     } catch (err: any) {
       setError(err?.error?.message_ar || 'خدمة الأقمار الصناعية غير متاحة حالياً.');
     } finally { setLoading(false); }
   };
 
+  // الرد يحتوي قائمة مشاهد (scenes)؛ نعرض أحدث مشهد صالح
+  const latestScene = result?.scenes?.length
+    ? [...result.scenes].sort((a: any, b: any) => String(b.acquired_at).localeCompare(String(a.acquired_at)))[0]
+    : null;
+
   const askAdvisorAboutNDVI = () => {
-    const ndvi = result?.vegetation?.ndvi?.mean?.toFixed(2);
+    const ndvi = latestScene?.ndvi?.mean?.toFixed(2);
     setPrefillQuestion(`أظهر تحليل الأقمار الصناعية أن مؤشر صحة النبات (NDVI) في مزرعتي هو ${ndvi}. ماذا تنصحني أن أفعل لتحسين صحة النخيل؟`);
     setScreen('advisor');
   };
@@ -137,8 +147,8 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
       {mode === 'yolo' && (
         <div className="card" style={{ padding: 24 }}>
           <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', border: '2px dashed #0B5D3B', borderRadius: 16, padding: 40, cursor: 'pointer', background: '#F7F3EA' }}>
-            <span style={{ fontWeight: 700, fontSize: 18, color: '#0B5D3B' }}>اضغط لاختيار صورة جوية</span>
-            <input type="file" accept="image/*" onChange={(e) => {
+            <span style={{ fontWeight: 700, fontSize: 18, color: '#0B5D3B' }}>اضغط لاختيار صورة جوية (JPEG أو PNG)</span>
+            <input type="file" accept="image/jpeg,image/png" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file || !sessionId || !activeFarmId) return;
                 setLoading(true); setError(null); setResult(null);
@@ -167,17 +177,27 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
       {result && mode === 'satellite' && (
         <div className="card" style={{ padding: 24 }}>
           <h3>نتيجة فحص المزرعة</h3>
-          {result.status === 'ok' && result.vegetation?.ndvi ? (
+          {result.status === 'ok' && latestScene?.ndvi ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ background: getHealthStatus(result.vegetation.ndvi.mean).bg, padding: 20, borderRadius: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 40 }}>{getHealthStatus(result.vegetation.ndvi.mean).icon}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: getHealthStatus(result.vegetation.ndvi.mean).color, marginTop: 8 }}>
-                  {getHealthStatus(result.vegetation.ndvi.mean).label}
+              <div style={{ background: getHealthStatus(latestScene.ndvi.mean).bg, padding: 20, borderRadius: 16, textAlign: 'center' }}>
+                <div style={{ fontSize: 40 }}>{getHealthStatus(latestScene.ndvi.mean).icon}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: getHealthStatus(latestScene.ndvi.mean).color, marginTop: 8 }}>
+                  {getHealthStatus(latestScene.ndvi.mean).label}
                 </div>
                 <div style={{ fontSize: 14, color: '#55615A', marginTop: 4 }}>
-                  مؤشر صحة النبات (NDVI): {result.vegetation.ndvi.mean.toFixed(2)}
+                  مؤشر صحة النبات (NDVI): {latestScene.ndvi.mean.toFixed(2)} · صورة Sentinel‑2 بتاريخ {String(latestScene.acquired_at).slice(0, 10)}
                 </div>
               </div>
+
+              {result.preview?.data && (
+                <img
+                  src={`data:${result.preview.media_type};base64,${result.preview.data}`}
+                  alt="خريطة NDVI للمزرعة"
+                  style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 12, background: '#F7F3EA' }}
+                />
+              )}
+
+              <div style={{ fontSize: 13, color: '#55615A' }}>{result.warning_ar}</div>
               
               <button className="btn" onClick={askAdvisorAboutNDVI} style={{ background: '#C8A25A', color: '#1E2A25', fontSize: 18 }}>
                 💬 اسأل المرشد: ماذا أفعل الآن؟
