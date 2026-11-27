@@ -31,9 +31,8 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
     
     // تحقق ذكي: هل الكمية تتجاوز مخلفات المزرعة؟
     if (qty > expectedWaste && expectedWaste > 0) {
-      if (!window.confirm(`تنبيه: الكمية المطلوبة (${qty} كجم) تتجاوز التقدير السنوي لمزرعتك (${expectedWaste} كجم). هل أنت متأكد؟`)) {
-        return;
-      }
+      setError(`تنبيه: الكمية المطلوبة (${qty} كجم) تتجاوز التقدير السنوي لمزرعتك (${expectedWaste.toLocaleString()} كجم). خفّض الكمية للمتابعة.`);
+      return;
     }
 
     // الخادم يقبل أعداداً صحيحة موجبة فقط (كجم)
