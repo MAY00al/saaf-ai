@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
-
+import { updateFarm } from '../api/client';
 export default function Profile({ setScreen }: { setScreen: (s: string) => void }) {
   const { profile, setProfile } = useAppStore();
   const [form, setForm] = useState(profile);
@@ -14,13 +14,25 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfile(form);
-    alert('تم حفظ بيانات المزرعة بنجاح!');
-    setScreen('monitor'); // الانتقال لصفحة الرصد بعد الحفظ كما في التصميم
+    
+    try {
+      await updateFarm('SIM-001', {
+        soil_ph: Number(form.ph),
+        irrigation_system: form.irr,
+        area_ha: Number(form.area),
+        lat: Number(form.lat), // أضفنا خط العرض
+        lon: Number(form.lon), // أضفنا خط الطول
+      });
+      alert('تم حفظ بيانات المزرعة بنجاح!');
+      setScreen('monitor');
+    } catch (err) {
+      alert('تم الحفظ محلياً، لكن تعذر المزامنة مع الخادم.');
+      setScreen('monitor');
+    }
   };
-
   const seg = (key: 'soil' | 'irr', val: string) => (
     <button type="button" onClick={() => setForm({ ...form, [key]: val })} style={{
       flex: 1, padding: 12, borderRadius: 14, border: '1px solid', 

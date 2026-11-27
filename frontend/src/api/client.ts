@@ -90,3 +90,11 @@ export async function saveBoundary(farmId: string, lat: number, lon: number) {
   });
   return res.json();
 }
+export async function updateFarm(farmId: string, data: any) {
+  const res = await fetch(`${API}/farms/${farmId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
