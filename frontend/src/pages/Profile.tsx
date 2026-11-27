@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { updateFarm } from '../api/client';
 export default function Profile({ setScreen }: { setScreen: (s: string) => void }) {
-  const { profile, setProfile, activeFarmId } = useAppStore();
+  const { profile, setProfile, activeFarmId, notify } = useAppStore();
   const [form, setForm] = useState(profile);
 
   // تحديث النموذج إذا تغيرت البيانات في المتجر
@@ -22,7 +22,7 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
     const valid = [soil_ph, area_ha, lat, lon].every(Number.isFinite)
       && area_ha > 0 && soil_ph >= 0 && soil_ph <= 14 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
     if (!valid) {
-      alert('تحقق من القيم: المساحة أكبر من صفر، وpH بين 0 و14، وخط العرض والطول رقمان صحيحان.');
+      notify('تحقق من القيم: المساحة أكبر من صفر، وpH بين 0 و14، وخط العرض والطول رقمان صحيحان.', 'error');
       return;
     }
 
@@ -36,10 +36,10 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
         lat,
         lon,
       });
-      alert('تم حفظ بيانات المزرعة بنجاح!');
+      notify('تم حفظ بيانات المزرعة بنجاح', 'success');
       setScreen('monitor');
-    } catch {
-      alert('تم الحفظ محلياً، لكن تعذر المزامنة مع الخادم.');
+    } catch (err: any) {
+      notify(err?.error?.message_ar || 'تم الحفظ محلياً، لكن تعذرت المزامنة مع الخادم.', 'error');
       setScreen('monitor');
     }
   };
