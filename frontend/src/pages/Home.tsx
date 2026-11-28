@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
+import { ScanEye, MessageCircle, Truck, ChartColumn, TreePalm, Leaf, Package, Sprout, ArrowLeft, MapPin } from 'lucide-react';
 import { getFarmStats, getImpact } from '../api/client';
 import { useAppStore } from '../store/useAppStore';
+import PalmFrond from '../components/PalmFrond';
+
+const STEPS = [
+  { key: 'monitor', n: '١', title: 'افحص', desc: 'عدّ النخيل بصورة جوية أو افحص صحة المزرعة بالقمر الصناعي.', icon: ScanEye },
+  { key: 'advisor', n: '٢', title: 'اسأل', desc: 'مرشد يجيبك بالدليل العلمي ويوضح حدود المعلومة.', icon: MessageCircle },
+  { key: 'collect', n: '٣', title: 'اجمع', desc: 'اطلب استلام السعف ليتحول إلى فحم حيوي بدل الحرق.', icon: Truck },
+  { key: 'impact', n: '٤', title: 'أثرك', desc: 'تابع طلباتك وملخص الأثر لمزرعتك.', icon: ChartColumn },
+];
 
 export default function Home({ setScreen }: { setScreen: (s: string) => void }) {
   const [stats, setStats] = useState<any>(null);
   const [impact, setImpact] = useState<any>(null);
-  
+
   const { profile } = useAppStore();
   const palms = parseInt(profile.palms) || 0;
   const waste = ((palms * 35) / 1000).toFixed(2);
@@ -16,76 +25,63 @@ export default function Home({ setScreen }: { setScreen: (s: string) => void }) 
   }, []);
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* الترحيب */}
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* بطاقة المزرعة */}
+      <div className="hero">
+        <PalmFrond className="frond-bg" size={210} color="currentColor" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#E6F2EC', fontSize: 14 }}>
+          <MapPin size={16} /> {profile.region} · {profile.soil} · pH {profile.ph}
+        </div>
+        <h1 style={{ margin: '6px 0 2px', fontWeight: 800, fontSize: 30, lineHeight: 1.35 }}>{profile.name}</h1>
+        <div style={{ color: '#E6F2EC', fontSize: 14.5 }}>مزرعة محاكاة · بيانات تجريبية</div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 18 }}>
+          <div className="hero-stat">
+            <TreePalm size={26} color="#C8A25A" />
+            <div><div className="l">عدد النخيل</div><div className="v">{palms.toLocaleString('en-US')}</div></div>
+          </div>
+          <div className="hero-stat">
+            <Leaf size={26} color="#C8A25A" />
+            <div><div className="l">المخلفات السنوية</div><div className="v">{waste} طن</div></div>
+          </div>
+        </div>
+
+        <button className="btn btn-gold" onClick={() => setScreen('monitor')} style={{ marginTop: 20, width: '100%', maxWidth: 360 }}>
+          ابدأ فحص مزرعتك <ArrowLeft size={20} />
+        </button>
+      </div>
+
+      {/* الرحلة */}
       <div>
-        <h1 style={{ fontWeight: 800, fontSize: 34, lineHeight: 1.4, margin: 0 }}>
-          مرحبًا يا {profile.owner}
-        </h1>
-        <div style={{ color: '#55615A' }}>منظومة ذكية لإدارة مخلفات النخيل وتحويلها إلى منتجات ذات قيمة.</div>
-      </div>
-
-      {/* شريط الرحلة (الترابط البصري) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, background: '#FFFDF9', padding: 16, borderRadius: 16, border: '1px solid #E5DCCB', justifyContent: 'center', alignItems: 'center' }}>
-        <span style={{ color: '#0B5D3B', fontWeight: 700 }}>١. الرصد</span>
-        <span style={{ color: '#C8A25A' }}>←</span>
-        <span style={{ color: '#0B5D3B', fontWeight: 700 }}>٢. المرشد</span>
-        <span style={{ color: '#C8A25A' }}>←</span>
-        <span style={{ color: '#0B5D3B', fontWeight: 700 }}>٣. الجمع</span>
-        <span style={{ color: '#C8A25A' }}>←</span>
-        <span style={{ color: '#0B5D3B', fontWeight: 700 }}>٤. الأثر</span>
-      </div>
-
-      {/* بطاقة المزرعة الشخصية */}
-      <div style={{ background: '#0B5D3B', color: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
-        <div style={{ flex: '1 1 200px' }}>
-          <div style={{ fontSize: 15, color: '#E6F2EC' }}>مزرعتك (المحاكاة)</div>
-          <div style={{ fontSize: 24, fontWeight: 800, fontFamily: 'Tajawal' }}>{profile.name}</div>
-          <div style={{ fontSize: 14, color: '#E6F2EC', marginTop: 4 }}>{profile.region} · {profile.soil} · pH {profile.ph}</div>
-        </div>
-        <div style={{ flex: '1 1 120px', textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 16 }}>
-          <div style={{ fontSize: 14, color: '#E6F2EC' }}>عدد النخيل</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{palms} نخلة</div>
-        </div>
-        <div style={{ flex: '1 1 120px', textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 16 }}>
-          <div style={{ fontSize: 14, color: '#E6F2EC' }}>المخلفات السنوية</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{waste} طن</div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 12px', color: 'var(--green)' }}>رحلتك في أربع خطوات</h2>
+        <div className="journey">
+          {STEPS.map(({ key, n, title, desc, icon: Icon }) => (
+            <button key={key} className="step" onClick={() => setScreen(key)}>
+              <span className="n">{n}</span>
+              <span className="badge"><Icon size={24} strokeWidth={1.9} /></span>
+              <b>{title}</b>
+              <span className="d">{desc}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <h2 style={{ fontSize: 22, fontWeight: 800, margin: '10px 0 0 0', color: '#0B5D3B' }}>إحصائيات المنصة</h2>
-      
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-        <div style={{ flex: '1 1 200px', background: '#F8F1E2', borderRadius: 20, padding: '18px 20px' }}>
-          <div style={{ color: '#0B5D3B', fontSize: 14.5, fontWeight: 700 }}>إجمالي المزارع</div>
-          <div style={{ fontFamily: 'Tajawal', fontWeight: 800, fontSize: 32, marginTop: 4 }}>{stats?.farm_count || '...'} مزرعة</div>
-        </div>
-        <div style={{ flex: '1 1 200px', background: '#E6F2EC', borderRadius: 20, padding: '18px 20px' }}>
-          <div style={{ color: '#0B5D3B', fontSize: 14.5, fontWeight: 700 }}>إجمالي المخلفات</div>
-          <div style={{ fontFamily: 'Tajawal', fontWeight: 800, fontSize: 32, marginTop: 4 }}>{stats?.total_est_residue_kg_per_year ? Math.round(stats.total_est_residue_kg_per_year / 1000) : '...'} طن</div>
-        </div>
-        <div style={{ flex: '1 1 200px', background: '#EAF4EE', borderRadius: 20, padding: '18px 20px' }}>
-          <div style={{ color: '#0B5D3B', fontSize: 14.5, fontWeight: 700 }}>الكمية المجمعة</div>
-          <div style={{ fontFamily: 'Tajawal', fontWeight: 800, fontSize: 32, marginTop: 4 }}>{impact?.metrics?.confirmed_requested_quantity_kg || 0} كجم</div>
-        </div>
-      </div>
-
-      {/* أزرار الانتقال السريع للوكلاء */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 10 }}>
-        <div className="card" style={{ flex: '1 1 300px', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>١. الرصد الذكي</h2>
-          <p style={{ margin: 0, color: '#55615A', fontSize: 14 }}>ارفع صورة جوية لعدّ النخيل، أو افحص صحة مزرعتك بالأقمار الصناعية (NDVI).</p>
-          <button className="btn" onClick={() => setScreen('monitor')} style={{ marginTop: 'auto' }}>ابدأ الرصد</button>
-        </div>
-        <div className="card" style={{ flex: '1 1 300px', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>٢. المرشد الذكي</h2>
-          <p style={{ margin: 0, color: '#55615A', fontSize: 14 }}>اسأل عن جرعة الفحم الحيوي، وأثرها على الماء والتربة، بالدليل العلمي.</p>
-          <button className="btn" onClick={() => setScreen('advisor')} style={{ marginTop: 'auto' }}>افتح المرشد</button>
-        </div>
-        <div className="card" style={{ flex: '1 1 300px', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>٣. جمع المخلفات</h2>
-          <p style={{ margin: 0, color: '#55615A', fontSize: 14 }}>احجز موعدًا لاستلام السعف وتحويله إلى فحم حيوي بدلًا من حرقه.</p>
-          <button className="btn" onClick={() => setScreen('collect')} style={{ marginTop: 'auto' }}>اطلب جمع</button>
+      {/* إحصائيات المنصة */}
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 12px', color: 'var(--green)' }}>المنصة بالأرقام</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <div className="stat" style={{ flex: '1 1 210px', background: 'var(--gold-lt)' }}>
+            <span className="badge gold"><TreePalm size={24} /></span>
+            <div><div className="lbl">المزارع المسجلة</div><div className="num">{stats?.farm_count ?? '...'}</div></div>
+          </div>
+          <div className="stat" style={{ flex: '1 1 210px', background: 'var(--green-lt)' }}>
+            <span className="badge"><Sprout size={24} /></span>
+            <div><div className="lbl">المخلفات السنوية المقدّرة</div><div className="num">{stats?.total_est_residue_kg_per_year ? Math.round(stats.total_est_residue_kg_per_year / 1000).toLocaleString('en-US') : '...'} <small style={{ fontSize: 15 }}>طن</small></div></div>
+          </div>
+          <div className="stat" style={{ flex: '1 1 210px', background: '#EAF4EE' }}>
+            <span className="badge"><Package size={24} /></span>
+            <div><div className="lbl">الكمية المطلوب جمعها</div><div className="num">{(impact?.metrics?.confirmed_requested_quantity_kg || 0).toLocaleString('en-US')} <small style={{ fontSize: 15 }}>كجم</small></div></div>
+          </div>
         </div>
       </div>
     </section>

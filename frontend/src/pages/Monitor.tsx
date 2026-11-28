@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useAppStore } from '../store/useAppStore';
 import { detectPalms, getSatellite, saveBoundary, API_BASE } from '../api/client';
+import { Satellite, Camera, MapPin, Image as ImageIcon, MessageCircle, ScanEye, CircleCheck, TriangleAlert, CircleAlert, Upload } from 'lucide-react';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -110,21 +111,21 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
 
   // تحويل NDVI إلى حالة مفهومة للمزارع
   const getHealthStatus = (ndvi: number) => {
-    if (ndvi >= 0.4) return { label: 'ممتازة (نباتات صحية)', color: '#0B5D3B', bg: '#E6F2EC', icon: '🟢' };
-    if (ndvi >= 0.2) return { label: 'تحتاج متابعة (إجهاد خفيف)', color: '#856404', bg: '#FFF3CD', icon: '🟡' };
-    return { label: 'تحتاج تدخل (جفاف شديد)', color: '#8E1C1C', bg: '#FDECEC', icon: '🔴' };
+    if (ndvi >= 0.4) return { label: 'ممتازة (نباتات صحية)', color: '#0B5D3B', bg: '#E6F2EC', Icon: CircleCheck };
+    if (ndvi >= 0.2) return { label: 'تحتاج متابعة (إجهاد خفيف)', color: '#856404', bg: '#FFF3CD', Icon: TriangleAlert };
+    return { label: 'تحتاج تدخل (جفاف شديد)', color: '#8E1C1C', bg: '#FDECEC', Icon: CircleAlert };
   };
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <h1 style={{ fontWeight: 800, fontSize: 32, color: '#0B5D3B', margin: 0 }}>الرصد والتحليل</h1>
+        <div className="page-title"><span className="badge solid"><ScanEye size={24} strokeWidth={1.9} /></span><h1>الرصد والتحليل</h1></div>
         <div style={{ color: '#55615A', fontSize: 15, marginTop: 4 }}>افحص صحة مزرعتك من الفضاء، أو اعدّ نخيلك بصورة جوية.</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #E5DCCB', paddingBottom: 10 }}>
-        <button className={mode === 'satellite' ? 'btn' : 'btn2'} onClick={() => { setMode('satellite'); setResult(null); }}>📍 فحص صحة المزرعة</button>
-        <button className={mode === 'yolo' ? 'btn' : 'btn2'} onClick={() => { setMode('yolo'); setResult(null); }}>📸 عدّ النخيل (YOLO)</button>
+      <div className="seg" style={{ borderBottom: '1px solid #E5DCCB', paddingBottom: 10 }}>
+        <button className={mode === 'satellite' ? 'btn' : 'btn2'} onClick={() => { setMode('satellite'); setResult(null); }}><Satellite size={20} /> فحص صحة المزرعة</button>
+        <button className={mode === 'yolo' ? 'btn' : 'btn2'} onClick={() => { setMode('yolo'); setResult(null); }}><Camera size={20} /> عدّ النخيل بصورة جوية</button>
       </div>
 
       {error && <div style={{ background: '#FDECEC', color: '#8E1C1C', padding: 16, borderRadius: 16 }}>{error}</div>}
@@ -135,9 +136,9 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
           
           {/* بطاقة الموقع المبسطة */}
           <div className="card" style={{ padding: 24, background: '#F7F3EA' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0, color: '#0B5D3B' }}>📍 موقع المزرعة</h3>
+                <h3 style={{ margin: 0, color: '#0B5D3B', display: 'flex', alignItems: 'center', gap: 8 }}><MapPin size={20} /> موقع المزرعة</h3>
                 <p style={{ margin: '4px 0 0', fontSize: 14, color: '#55615A' }}>
                   تم تحديد الموقع بناءً على بيانات ملفك الشخصي ({Number(profile.lat).toFixed(4)}, {Number(profile.lon).toFixed(4)}).
                 </p>
@@ -166,7 +167,7 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
           </div>
 
           {/* زر الفحص */}
-          <div className="card" style={{ padding: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card" style={{ padding: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
             <div>
               <h3 style={{ margin: 0 }}>هل نخيلك بصحة جيدة؟</h3>
               <p style={{ margin: 0, color: '#55615A', fontSize: 14 }}>سنستخدم صور الأقمار الصناعية لفحص صحة النباتات.</p>
@@ -182,7 +183,8 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
       {mode === 'yolo' && (
         <div className="card" style={{ padding: 24 }}>
           <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', border: '2px dashed #0B5D3B', borderRadius: 16, padding: 40, cursor: 'pointer', background: '#F7F3EA' }}>
-            <span style={{ fontWeight: 700, fontSize: 18, color: '#0B5D3B' }}>اضغط لاختيار صورة جوية (JPEG أو PNG)</span>
+            <Upload size={34} color="#0B5D3B" strokeWidth={1.7} style={{ marginBottom: 8 }} />
+            <span style={{ fontWeight: 700, fontSize: 18, color: '#0B5D3B', textAlign: 'center' }}>اضغط لاختيار صورة جوية (JPEG أو PNG)</span>
             <input type="file" accept="image/jpeg,image/png" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) analyzeImage(file);
@@ -190,7 +192,7 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
           </label>
           {sample && (
             <button className="btn2" onClick={useSampleImage} disabled={loading} style={{ marginTop: 12, width: '100%' }}>
-              🖼️ جرّب بصورة جوية تجريبية
+              <ImageIcon size={20} /> جرّب بصورة جوية تجريبية
             </button>
           )}
         </div>
@@ -218,7 +220,7 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
           {result.status === 'ok' && latestScene?.ndvi ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: getHealthStatus(latestScene.ndvi.mean).bg, padding: 20, borderRadius: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 40 }}>{getHealthStatus(latestScene.ndvi.mean).icon}</div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>{(() => { const H = getHealthStatus(latestScene.ndvi.mean); return <H.Icon size={46} color={H.color} strokeWidth={1.7} />; })()}</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: getHealthStatus(latestScene.ndvi.mean).color, marginTop: 8 }}>
                   {getHealthStatus(latestScene.ndvi.mean).label}
                 </div>
@@ -238,7 +240,7 @@ export default function Monitor({ setScreen }: { setScreen: (s: string) => void 
               <div style={{ fontSize: 13, color: '#55615A' }}>{result.warning_ar}</div>
               
               <button className="btn" onClick={askAdvisorAboutNDVI} style={{ background: '#C8A25A', color: '#1E2A25', fontSize: 18 }}>
-                💬 اسأل المرشد: ماذا أفعل الآن؟
+                <MessageCircle size={22} /> اسأل المرشد: ماذا أفعل الآن؟
               </button>
             </div>
           ) : (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getImpact, getFarmCollections } from '../api/client';
 import { useAppStore } from '../store/useAppStore';
+import { ChartColumn } from 'lucide-react';
 
 export default function Impact() {
   const [data, setData] = useState<any>(null);
@@ -27,7 +28,7 @@ export default function Impact() {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h1 style={{ fontWeight: 800, fontSize: 32, color: '#0B5D3B', margin: 0 }}>تقرير الأثر</h1>
+        <div className="page-title"><span className="badge solid"><ChartColumn size={24} strokeWidth={1.9} /></span><h1>تقرير الأثر</h1></div>
         <div style={{ color: '#55615A', fontSize: 15 }}>ملخص الأثر البيئي لمنصة سعف وللمزارع المسجلة.</div>
       </div>
 
@@ -57,7 +58,7 @@ export default function Impact() {
           </div>
           <div style={{ flex: '1 1 160px', background: '#E6F2EC', padding: 14, borderRadius: 14 }}>
             <div style={{ fontSize: 13, color: '#55615A' }}>الكمية المطلوبة لمزرعتك</div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#0B5D3B' }}>{mine === null ? '...' : mineKg.toLocaleString()} كجم</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#0B5D3B' }}>{mine === null ? '...' : mineKg.toLocaleString('en-US')} كجم</div>
           </div>
         </div>
 

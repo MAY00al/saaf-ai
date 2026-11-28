@@ -1,59 +1,80 @@
-import { Home, User, Eye, MessageCircle, Calendar, BarChart3, Truck } from 'lucide-react';
+import { House, User, ScanEye, MessageCircle, Truck, ChartColumn, Warehouse } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
-export default function Sidebar({ screen, setScreen }: { screen: string, setScreen: (s: string) => void }) {
+const MAIN = [
+  { key: 'home', label: 'الرئيسية', icon: House },
+  { key: 'monitor', label: 'افحص', icon: ScanEye },
+  { key: 'advisor', label: 'اسأل', icon: MessageCircle },
+  { key: 'collect', label: 'اجمع', icon: Truck },
+  { key: 'impact', label: 'أثرك', icon: ChartColumn },
+];
+const MORE = [
+  { key: 'profile', label: 'ملف المزرعة', icon: User },
+  { key: 'operator', label: 'لوحة الجامع', icon: Warehouse },
+];
+
+export default function Sidebar({ screen, setScreen }: { screen: string; setScreen: (s: string) => void }) {
   const { farms, activeFarmId, setFarm } = useAppStore();
-  const nav = [
-    { key: 'home', label: 'الرئيسية', icon: Home },
-    { key: 'profile', label: 'ملفي', icon: User },
-    { key: 'monitor', label: '١ الرصد', icon: Eye },
-    { key: 'advisor', label: '٢ المرشد', icon: MessageCircle },
-    { key: 'collect', label: '٣ الجمع', icon: Calendar },
-    { key: 'impact', label: '٤ الأثر', icon: BarChart3 },
-    { key: 'operator', label: 'لوحة الجامع', icon: Truck },
-  ];
+
+  const farmSelect = (id: string) => (
+    <select
+      id={id}
+      aria-label="المزرعة النشطة"
+      value={activeFarmId ?? ''}
+      onChange={(e) => setFarm(e.target.value)}
+      disabled={farms.length === 0}
+      className="farm-select"
+    >
+      {farms.length === 0 && <option value="">{activeFarmId ?? '...'}</option>}
+      {farms.map((f) => (
+        <option key={f.farm_id} value={f.farm_id}>{f.farm_id} · {f.region}</option>
+      ))}
+    </select>
+  );
 
   return (
-    <aside className="side">
-      <div className="logobox">
-        <img
-          src="/logo.png"
-          alt="شعار سعف"
-          style={{ height: '70px', width: 'auto', objectFit: 'contain' }}
-        />
-      </div>
-      <nav className="navlist">
-        {nav.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              className={`navbtn ${screen === item.key ? 'active' : ''}`}
-              onClick={() => setScreen(item.key)}
-            >
-              <Icon size={22} />
-              <span>{item.label}</span>
+    <>
+      {/* الشاشات الكبيرة: شريط جانبي */}
+      <aside className="side">
+        <div className="logobox">
+          <img src="/logo-tight.png" alt="سعف" style={{ height: 64, width: 'auto', objectFit: 'contain' }} />
+        </div>
+        <nav className="navlist" aria-label="التنقل الرئيسي">
+          {[...MAIN, ...MORE].map(({ key, label, icon: Icon }) => (
+            <button key={key} className={`navbtn ${screen === key ? 'active' : ''}`} onClick={() => setScreen(key)}
+              aria-current={screen === key ? 'page' : undefined}>
+              <Icon size={22} strokeWidth={1.9} />
+              <span>{label}</span>
             </button>
-          );
-        })}
-      </nav>
-      <div className="sidefoot">
-        <label htmlFor="farm-select" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 6 }}>
-          المزرعة النشطة (محاكاة)
-        </label>
-        <select
-          id="farm-select"
-          value={activeFarmId ?? ''}
-          onChange={(e) => setFarm(e.target.value)}
-          disabled={farms.length === 0}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 10, border: '1px solid #E5DCCB', fontSize: 14, background: '#FFFDF9', color: '#1E2A25' }}
-        >
-          {farms.length === 0 && <option value="">{activeFarmId ?? 'جارٍ التحميل...'}</option>}
-          {farms.map((f) => (
-            <option key={f.farm_id} value={f.farm_id}>{f.farm_id} · {f.region}</option>
           ))}
-        </select>
-      </div>
-    </aside>
+        </nav>
+        <div className="sidefoot">
+          <label htmlFor="farm-select-d" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 6 }}>
+            المزرعة النشطة (محاكاة)
+          </label>
+          {farmSelect('farm-select-d')}
+        </div>
+      </aside>
+
+      {/* الجوال: شريط علوي + شريط تنقل سفلي */}
+      <header className="topbar">
+        <img src="/logo-tight.png" alt="سعف" style={{ height: 34, width: 'auto' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>{farmSelect('farm-select-m')}</div>
+        {MORE.map(({ key, label, icon: Icon }) => (
+          <button key={key} className={`iconbtn ${screen === key ? 'active' : ''}`} onClick={() => setScreen(key)} aria-label={label} title={label}>
+            <Icon size={21} strokeWidth={1.9} />
+          </button>
+        ))}
+      </header>
+      <nav className="bottomnav" aria-label="التنقل السريع">
+        {MAIN.map(({ key, label, icon: Icon }) => (
+          <button key={key} className={screen === key ? 'active' : ''} onClick={() => setScreen(key)}
+            aria-current={screen === key ? 'page' : undefined}>
+            <Icon size={23} strokeWidth={screen === key ? 2.3 : 1.8} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+    </>
   );
 }

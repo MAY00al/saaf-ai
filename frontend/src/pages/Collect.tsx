@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { proposeCollection, confirmCollection } from '../api/client';
+import { Truck, Upload, CircleCheck, PartyPopper, Sprout } from 'lucide-react';
 
 export default function Collect({ setScreen }: { setScreen: (s: string) => void }) {
   const { sessionId, activeFarmId, profile } = useAppStore();
@@ -31,7 +32,7 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
     
     // تحقق ذكي: هل الكمية تتجاوز مخلفات المزرعة؟
     if (qty > expectedWaste && expectedWaste > 0) {
-      setError(`تنبيه: الكمية المطلوبة (${qty} كجم) تتجاوز التقدير السنوي لمزرعتك (${expectedWaste.toLocaleString()} كجم). خفّض الكمية للمتابعة.`);
+      setError(`تنبيه: الكمية المطلوبة (${qty} كجم) تتجاوز التقدير السنوي لمزرعتك (${expectedWaste.toLocaleString('en-US')} كجم). خفّض الكمية للمتابعة.`);
       return;
     }
 
@@ -89,7 +90,7 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
   return (
     <section style={{ maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h1 style={{ fontWeight: 800, fontSize: 32, color: '#0B5D3B', margin: 0 }}>جمع السعف</h1>
+        <div className="page-title"><span className="badge solid"><Truck size={24} strokeWidth={1.9} /></span><h1>جمع السعف</h1></div>
         <div style={{ color: '#55615A', fontSize: 15 }}>نربطك بشركات التحويل إلى فحم حيوي.</div>
       </div>
 
@@ -102,11 +103,11 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
           <h3 style={{ margin: 0 }}>١. حدد الكمية التي تريد جمعها</h3>
           
           <div style={{ background: '#F8F1E2', border: '1px solid #C8A25A', padding: 12, borderRadius: 12, fontSize: 14 }}>
-            بناءً على عدد نخيلك (<b>{palms}</b> نخلة)، نقدر أن مزرعتك تنتج <b>{expectedWaste.toLocaleString()}</b> كجم من السعف سنوياً.
+            بناءً على عدد نخيلك (<b>{palms}</b> نخلة)، نقدر أن مزرعتك تنتج <b>{expectedWaste.toLocaleString('en-US')}</b> كجم من السعف سنوياً.
           </div>
 
           <label style={{ border: '2px dashed #0B5D3B', borderRadius: 16, padding: 30, textAlign: 'center', cursor: 'pointer', background: '#F7F3EA' }}>
-            <span style={{ fontWeight: 700, color: '#0B5D3B' }}>{photo ? '✓ تم إرفاق صورة السعف (محاكاة)' : 'اضغط لرفع صورة السعف (اختياري)'}</span>
+            <span style={{ fontWeight: 700, color: '#0B5D3B', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{photo ? <CircleCheck size={20} /> : <Upload size={20} />}{photo ? 'تم إرفاق صورة السعف (محاكاة)' : 'اضغط لرفع صورة السعف (اختياري)'}</span>
             <input type="file" onChange={() => setPhoto(true)} style={{ display: 'none' }} />
           </label>
 
@@ -157,17 +158,17 @@ export default function Collect({ setScreen }: { setScreen: (s: string) => void 
       {/* الخطوة 4: النجاح والربط بالأثر */}
       {step === 4 && saved && (
         <div className="card" style={{ padding: 40, textAlign: 'center', background: '#E6F2EC' }}>
-          <div style={{ fontSize: 50, marginBottom: 10 }}>🎉</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}><PartyPopper size={54} color="#0B5D3B" strokeWidth={1.6} /></div>
           <h2 style={{ color: '#0B5D3B', fontSize: 28 }}>تم إرسال طلبك بنجاح!</h2>
           
-          <div style={{ background: '#FFFDF9', padding: 20, borderRadius: 16, display: 'inline-block', margin: '20px 0', border: '1px solid #E5DCCB' }}>
+          <div style={{ background: '#FFFDF9', padding: 20, borderRadius: 16, display: 'block', maxWidth: '100%', overflowWrap: 'anywhere', margin: '20px auto', border: '1px solid #E5DCCB' }}>
             <p style={{ margin: 0 }}>رقم الطلب: <b style={{ color: '#0B5D3B' }}>{saved.request_id}</b></p>
             <p style={{ margin: '8px 0 0 0' }}>الحالة: <b>{saved.status === 'confirmed' ? 'مؤكد' : saved.status === 'cancelled' ? 'ملغى' : saved.status}</b></p>
           </div>
 
           <div style={{ background: '#0B5D3B', color: '#fff', padding: 16, borderRadius: 12, marginBottom: 20 }}>
             <p style={{ margin: 0, fontSize: 18 }}>
-              🌱 تم تسجيل طلب جمع <b>{draft?.requested_quantity_kg}</b> كجم من السعف لتحويلها إلى فحم حيوي بدل التخلص منها.
+              <Sprout size={20} style={{ display: 'inline', verticalAlign: 'text-bottom', marginInlineEnd: 8 }} />تم تسجيل طلب جمع <b>{draft?.requested_quantity_kg}</b> كجم من السعف لتحويلها إلى فحم حيوي بدل التخلص منها.
             </p>
             <p style={{ margin: '8px 0 0 0', fontSize: 13, opacity: 0.85 }}>
               طلب محاكاة: لا يمثل استلاماً ميدانياً ولا يثبت كمية مجنّبة من الحرق.

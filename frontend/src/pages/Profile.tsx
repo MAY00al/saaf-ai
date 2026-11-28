@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { updateFarm } from '../api/client';
+import { User } from 'lucide-react';
 export default function Profile({ setScreen }: { setScreen: (s: string) => void }) {
   const { profile, setProfile, activeFarmId, notify } = useAppStore();
   const [form, setForm] = useState(profile);
@@ -56,7 +57,7 @@ export default function Profile({ setScreen }: { setScreen: (s: string) => void 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h1 style={{ fontWeight: 800, fontSize: 32, color: '#0B5D3B', margin: 0 }}>ملفي</h1>
+        <div className="page-title"><span className="badge solid"><User size={24} strokeWidth={1.9} /></span><h1>ملف المزرعة</h1></div>
         <div style={{ color: '#55615A', fontSize: 15 }}>معلوماتك ومعلومات مزرعتك. بعد الحفظ يحلل وكيل الأقمار الصناعية مزرعتك تلقائيًا.</div>
       </div>
 
