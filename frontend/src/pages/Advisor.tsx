@@ -1,6 +1,7 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { sendChat } from '../api/client';
+import { Truck } from 'lucide-react';
 
 export default function Advisor({ setScreen }: { setScreen: (s: string) => void }) {
   const { sessionId, activeFarmId, profile, prefillQuestion, setPrefillQuestion } = useAppStore();
@@ -115,7 +116,7 @@ export default function Advisor({ setScreen }: { setScreen: (s: string) => void 
                     onClick={() => setScreen('collect')} 
                     style={{ fontSize: 15, background: '#C8A25A', color: '#1E2A25', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
-                    🚛 احجز موعد جمع السعف الآن
+                    <Truck size={20} /> احجز موعد جمع السعف الآن
                   </button>
                 </div>
               )}
